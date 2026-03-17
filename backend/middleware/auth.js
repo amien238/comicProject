@@ -1,38 +1,45 @@
 const jwt = require('jsonwebtoken');
 
-// Middleware 1: Kiểm tra người dùng đã đăng nhập chưa
+const JWT_SECRET = process.env.JWT_SECRET || 'secret_tam_thoi';
+
+const getBearerToken = (req) => {
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) return null;
+  return authHeader.slice(7).trim() || null;
+};
+
 const protect = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = getBearerToken(req);
 
-  if (!token) return res.status(401).json({ error: 'Truy cập bị từ chối! Vui lòng đăng nhập.' });
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized. Please login first.' });
+  }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'secret_tam_thoi', (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token không hợp lệ hoặc đã hết hạn!' });
-    
-    req.user = user; 
-    next(); 
+  jwt.verify(token, JWT_SECRET, (err, payload) => {
+    if (err) {
+      return res.status(403).json({ error: 'Token is invalid or expired.' });
+    }
+
+    req.user = payload;
+    return next();
   });
 };
 
-// Middleware 2: Kiểm tra Role tác giả
 const isAuthor = (req, res, next) => {
-  if (req.user.role !== 'AUTHOR' && req.user.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Bạn không có quyền! Yêu cầu tài khoản Tác giả.' });
+  if (!req.user || (req.user.role !== 'AUTHOR' && req.user.role !== 'ADMIN')) {
+    return res.status(403).json({ error: 'Author or admin permission required.' });
   }
-  next();
+
+  return next();
 };
 
-// Middleware 3: Tùy chọn đăng nhập (Dành cho API Đọc truyện)
-const optionalAuth = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+const optionalAuth = (req, _res, next) => {
+  const token = getBearerToken(req);
+  if (!token) return next();
 
-  if (!token) return next(); // Không có token thì cứ đi tiếp (req.user sẽ bị undefined)
-
-  jwt.verify(token, process.env.JWT_SECRET || 'secret_tam_thoi', (err, user) => {
-    if (!err) req.user = user; // Nếu token chuẩn thì gắn user vào
-    next();
+  jwt.verify(token, JWT_SECRET, (err, payload) => {
+    if (!err) req.user = payload;
+    return next();
   });
 };
 

@@ -1,40 +1,56 @@
 const prisma = require('../config/db');
 
-// [POST] Cập nhật lịch sử đọc (Gọi khi user mở 1 chương truyện)
 const updateHistory = async (req, res) => {
   try {
-    const { comicId, chapterId } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    const { comicId, chapterId } = req.body || {};
+
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+    if (!comicId || !chapterId) {
+      return res.status(400).json({ error: 'comicId and chapterId are required.' });
+    }
+
+    const chapter = await prisma.chapter.findUnique({
+      where: { id: chapterId },
+      select: { id: true, comicId: true },
+    });
+
+    if (!chapter || chapter.comicId !== comicId) {
+      return res.status(400).json({ error: 'Invalid comicId/chapterId pair.' });
+    }
 
     const history = await prisma.readingHistory.upsert({
       where: { userId_comicId: { userId, comicId } },
       update: { chapterId, updatedAt: new Date() },
-      create: { userId, comicId, chapterId }
+      create: { userId, comicId, chapterId },
     });
 
-    res.json({ message: 'Đã lưu lịch sử đọc', history });
+    return res.json({ message: 'Reading history updated.', history });
   } catch (error) {
-    console.error("Lỗi lưu lịch sử:", error);
-    res.status(500).json({ error: 'Lỗi server khi lưu lịch sử' });
+    console.error('updateHistory error:', error);
+    return res.status(500).json({ error: 'Server error while updating reading history.' });
   }
 };
 
-// [GET] Lấy danh sách truyện vừa đọc của tôi
 const getMyHistory = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
     const history = await prisma.readingHistory.findMany({
       where: { userId },
       include: {
-        comic: { select: { title: true, coverUrl: true } },
-        chapter: { select: { title: true, orderNumber: true } }
+        comic: { select: { id: true, title: true, coverUrl: true } },
+        chapter: { select: { id: true, title: true, orderNumber: true } },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 10 // Chỉ lấy 10 truyện gần nhất
+      take: 10,
     });
-    res.json(history);
+
+    return res.json(history);
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi lấy lịch sử' });
+    console.error('getMyHistory error:', error);
+    return res.status(500).json({ error: 'Server error while fetching reading history.' });
   }
 };
 

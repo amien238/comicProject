@@ -1,13 +1,10 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 
-// 1. Nhúng file cấu hình Database (để dùng cho API test-db)
-// Dựa theo cây thư mục của bạn là: backend/config/db.js
-const prisma = require('./config/db'); 
+const prisma = require('./config/db');
 
-// 2. Nhúng file Routes
-// Dựa theo cây thư mục của bạn là: backend/routes/authRoutes.js
 const authRoutes = require('./routes/authRoutes');
 const comicRoutes = require('./routes/comicsRoutes');
 const chapterRoutes = require('./routes/chapterRoutes');
@@ -20,37 +17,29 @@ const aiRoutes = require('./routes/aiRoutes');
 const historyRoutes = require('./routes/historyRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
-
 const app = express();
 
-// Middleware chung
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
-// ==========================================
-// API GỐC & TEST HỆ THỐNG
-// ==========================================
-app.get('/', (req, res) => {
-  res.send('Chào mừng đến với Backend của AmienComic! 🚀 Hệ thống đã phân chia thư mục chuẩn.');
+app.get('/', (_req, res) => {
+  res.send('AmienComic backend is running.');
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server AmienComic đang chạy mượt mà 🚀' });
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', message: 'Server is healthy.' });
 });
 
-app.get('/api/test-db', async (req, res) => {
+app.get('/api/test-db', async (_req, res) => {
   try {
-    const users = await prisma.user.findMany();
-    res.json({ message: 'Kết nối Database thành công! 🎉', userCount: users.length, users });
+    const userCount = await prisma.user.count();
+    res.json({ message: 'Database connected.', userCount });
   } catch (error) {
-    console.error('Lỗi DB:', error);
-    res.status(500).json({ error: 'Không thể kết nối tới Database', details: error.message });
+    console.error('test-db error:', error);
+    res.status(500).json({ error: 'Cannot connect to database.', details: error.message });
   }
 });
 
-// ==========================================
-// KẾT NỐI ROUTER (Chuyển hướng API)
-// ==========================================
 app.use('/api/auth', authRoutes);
 app.use('/api/comics', comicRoutes);
 app.use('/api/chapters', chapterRoutes);
@@ -62,11 +51,13 @@ app.use('/api/tags', tagsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/notification', notificationRoutes);
+app.use('/api/notifications', notificationRoutes);
 
-// ==========================================
-// KHỞI ĐỘNG SERVER
-// ==========================================
+app.use((req, res) => {
+  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });

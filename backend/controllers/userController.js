@@ -1,11 +1,10 @@
 const prisma = require('../config/db');
 
-// [GET] Lấy thông tin cá nhân của người đang đăng nhập
 const getMe = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
 
-    // Tìm user trong DB, nhưng KHÔNG lấy passwordHash để bảo mật
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -14,103 +13,102 @@ const getMe = async (req, res) => {
         name: true,
         role: true,
         points: true,
+        totalDeposited: true,
         avatar: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
-    if (!user) return res.status(404).json({ error: 'Không tìm thấy người dùng!' });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
 
-    res.json(user);
+    return res.json(user);
   } catch (error) {
-    console.error("Lỗi lấy thông tin user:", error);
-    res.status(500).json({ error: 'Lỗi server khi lấy thông tin người dùng' });
+    console.error('getMe error:', error);
+    return res.status(500).json({ error: 'Server error while fetching user profile.' });
   }
 };
 
-// [GET] Lấy danh sách các chương truyện người dùng ĐÃ MUA
 const getMyUnlockedChapters = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
 
     const unlocked = await prisma.unlockedChapter.findMany({
-      where: { userId: userId },
+      where: { userId },
       include: {
         chapter: {
           select: {
             id: true,
             title: true,
             orderNumber: true,
+            price: true,
             comic: {
-              select: { id: true, title: true, coverUrl: true } // Lấy kèm tên và ảnh bìa truyện
-            }
-          }
-        }
+              select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: { unlockedAt: 'desc' } // Mua mới nhất xếp lên đầu
+      orderBy: { unlockedAt: 'desc' },
     });
 
-    // Format lại dữ liệu cho đẹp mắt trước khi gửi về Frontend
-    const formattedData = unlocked.map(item => ({
+    const formattedData = unlocked.map((item) => ({
       unlockedAt: item.unlockedAt,
       chapterId: item.chapter.id,
       chapterTitle: item.chapter.title,
+      chapterOrder: item.chapter.orderNumber,
+      chapterPrice: item.chapter.price,
       comicId: item.chapter.comic.id,
       comicTitle: item.chapter.comic.title,
-      comicCover: item.chapter.comic.coverUrl
+      comicCover: item.chapter.comic.coverUrl,
     }));
 
-    res.json(formattedData);
+    return res.json(formattedData);
   } catch (error) {
-    console.error("Lỗi lấy lịch sử mua truyện:", error);
-    res.status(500).json({ error: 'Lỗi server khi lấy lịch sử mua truyện' });
+    console.error('getMyUnlockedChapters error:', error);
+    return res.status(500).json({ error: 'Server error while fetching unlocked chapters.' });
   }
 };
 
-// [GET] Lấy danh sách truyện YÊU THÍCH
 const getMyFavorites = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
     const favorites = await prisma.favorite.findMany({
-      where: { userId: userId },
-      include: {
-        comic: {
-          select: { id: true, title: true, coverUrl: true, author: { select: { name: true } } }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const formattedData = favorites.map(item => ({
-      id: item.id,
-      comicId: item.comic.id,
-      title: item.comic.title,
-      coverUrl: item.comic.coverUrl,
-      authorName: item.comic.author?.name
-    }));
-
-    res.json(formattedData);
-  } catch (error) {
-    console.error("Lỗi lấy danh sách yêu thích:", error);
-    res.status(500).json({ error: 'Lỗi server khi lấy truyện yêu thích' });
-  }
-};
-
-const getMyHistory = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const history = await prisma.readingHistory.findMany({
       where: { userId },
       include: {
-        comic: true, // Quan trọng: Phải lấy comic để Frontend có ảnh bìa/tên
-        chapter: true
+        comic: {
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+            averageRating: true,
+            views: true,
+            author: { select: { name: true } },
+          },
+        },
       },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
-    res.json(history);
+
+    const formattedData = favorites.map((fav) => ({
+      comicId: fav.comic.id,
+      title: fav.comic.title,
+      coverUrl: fav.comic.coverUrl,
+      averageRating: fav.comic.averageRating,
+      views: fav.comic.views,
+      authorName: fav.comic.author?.name || 'Unknown',
+    }));
+
+    return res.json(formattedData);
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi lấy lịch sử đọc' });
+    console.error('getMyFavorites error:', error);
+    return res.status(500).json({ error: 'Server error while fetching favorites.' });
   }
 };
 
-module.exports = { getMe, getMyUnlockedChapters, getMyFavorites, getMyHistory };
+module.exports = { getMe, getMyUnlockedChapters, getMyFavorites };

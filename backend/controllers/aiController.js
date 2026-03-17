@@ -1,73 +1,100 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const prisma = require('../config/db');
 
-/**
- * AI Controller: Trả lời dựa trên ngữ cảnh người dùng và dữ liệu truyện thật
- */
+const toSafeHistory = (history) => {
+  if (!Array.isArray(history)) return [];
+
+  return history
+    .map((item) => {
+      const role = item?.role === 'user' ? 'user' : 'model';
+      const text = item?.parts?.[0]?.text;
+      if (typeof text !== 'string' || !text.trim()) return null;
+      return { role, parts: [{ text: text.trim() }] };
+    })
+    .filter(Boolean)
+    .slice(-20);
+};
+
 const chatWithBot = async (req, res) => {
   try {
-    const { history } = req.body; 
-    const userId = req.user?.userId; // Lấy từ authenticateToken hoặc optionalAuth
+    const API_KEY = process.env.GEMINI_API_KEY;
+    if (!API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is missing on server.' });
+    }
 
-    const API_KEY = process.env.GEMINI_API_KEY; 
-    if (!API_KEY) return res.status(500).json({ error: 'Server chưa có API Key' });
+    const userId = req.user?.userId;
+    const safeHistory = toSafeHistory(req.body?.history || []);
 
-    // 1. TRUY XUẤT DỮ LIỆU ĐA LUỒNG TỪ DATABASE
+    if (safeHistory.length === 0) {
+      return res.status(400).json({ error: 'history is required.' });
+    }
+
     const [allComics, userReadingHistory] = await Promise.all([
-      // Lấy danh sách truyện đang có
-      prisma.comic.findMany({ 
-        select: { title: true, description: true, tags: { select: { name: true } } } 
+      prisma.comic.findMany({
+        select: {
+          title: true,
+          description: true,
+          tags: { select: { name: true } },
+        },
+        take: 200,
       }),
-      // Lấy 5 truyện người dùng này đọc gần nhất (nếu đã đăng nhập)
-      userId ? prisma.readingHistory.findMany({
-        where: { userId },
-        include: { comic: { select: { title: true } }, chapter: { select: { title: true } } },
-        orderBy: { updatedAt: 'desc' },
-        take: 5
-      }) : []
+      userId
+        ? prisma.readingHistory.findMany({
+            where: { userId },
+            include: {
+              comic: { select: { title: true } },
+              chapter: { select: { title: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: 5,
+          })
+        : [],
     ]);
 
-    // 2. CHUẨN BỊ NGỮ CẢNH (CONTEXT)
-    const comicCtx = allComics.map(c => `- ${c.title} (${c.tags.map(t => t.name).join(', ')}): ${c.description.substring(0, 40)}...`).join('\n');
-    
-    const historyCtx = userReadingHistory.length > 0 
-      ? `Người dùng này đang theo dõi: ${userReadingHistory.map(h => `${h.comic.title} (đến ${h.chapter.title})`).join(', ')}.`
-      : "Người dùng chưa có lịch sử đọc hoặc chưa đăng nhập.";
+    const comicCtx = allComics
+      .map((comic) => {
+        const tags = comic.tags.map((tag) => tag.name).join(', ') || 'No tags';
+        const desc = (comic.description || '').slice(0, 80);
+        return `- ${comic.title} [${tags}]: ${desc}`;
+      })
+      .join('\n');
 
-    // 3. CẤU HÌNH GOOGLE AI
+    const historyCtx = userReadingHistory.length
+      ? `User recent reads: ${userReadingHistory
+          .map((item) => `${item.comic.title} (latest: ${item.chapter.title})`)
+          .join(', ')}`
+      : 'User has no reading history yet.';
+
+    const systemInstruction = [
+      'You are Amien Bot for a comic platform.',
+      'Only answer questions related to comics on this platform.',
+      'If user asks for recommendations, prioritize matching from reading history.',
+      'Answer in Vietnamese, friendly and concise.',
+      '',
+      'Available comics:',
+      comicCtx || '- No comic data yet.',
+      '',
+      historyCtx,
+    ].join('\n');
+
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const systemInstruction = `Bạn là Amien Bot - Trợ lý thông minh của AmienComic.
-    
-    DANH SÁCH TRUYỆN TRÊN WEB:
-    ${comicCtx}
-    
-    LỊCH SỬ CỦA NGƯỜI ĐANG CHAT:
-    ${historyCtx}
-
-    NHIỆM VỤ:
-    - Nếu họ hỏi gợi ý, hãy dựa vào lịch sử đọc của họ để tư vấn truyện cùng thể loại.
-    - Trả lời thân thiện, xưng mình gọi bạn.
-    - Tuyệt đối không trả lời về các chủ đề ngoài truyện tranh.
-    - Nếu họ hỏi về nhân vật, hãy đối chiếu xem nhân vật đó có nằm trong mô tả các truyện trên không.`;
-
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-      systemInstruction: systemInstruction,
+      model: 'gemini-2.5-flash-lite',
+      systemInstruction,
     });
 
     const chat = model.startChat({
-      history: history.slice(0, -1),
+      history: safeHistory.slice(0, -1),
     });
 
-    const lastMessage = history[history.length - 1].parts[0].text;
+    const lastMessage = safeHistory[safeHistory.length - 1]?.parts?.[0]?.text || '';
     const result = await chat.sendMessage(lastMessage);
     const response = await result.response;
-    
-    res.json({ reply: response.text() });
 
+    return res.json({ reply: response.text() });
   } catch (error) {
-    console.error("Lỗi AI Controller:", error.message);
-    res.status(500).json({ error: 'Nexus Bot đang bận suy nghĩ, bạn thử lại sau nhé!' });
+    console.error('chatWithBot error:', error);
+    return res.status(500).json({ error: 'AI service is temporarily unavailable.' });
   }
 };
 

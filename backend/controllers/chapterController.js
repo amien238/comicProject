@@ -1,178 +1,221 @@
 const prisma = require('../config/db');
 
-// ==========================================
-// 1. [POST] Thêm chương mới (Dành cho Tác giả)
-// ==========================================
+const toInt = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 const createChapter = async (req, res) => {
   try {
-    const { comicId, title, orderNumber, price, images } = req.body;
+    const { comicId, title, orderNumber, price, images } = req.body || {};
 
-    // KIỂM TRA DỮ LIỆU ẢNH: Ngăn chặn tạo chương rỗng
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      return res.status(400).json({ error: 'Chương truyện phải có ít nhất 1 ảnh!' });
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Unauthorized.' });
     }
 
-    // TÌM THÔNG TIN TRUYỆN ĐỂ TẠO THÔNG BÁO
-    const comic = await prisma.comic.findUnique({ where: { id: comicId } });
-    if (!comic) return res.status(404).json({ error: 'Không tìm thấy bộ truyện gốc' });
+    const normalizedComicId = typeof comicId === 'string' ? comicId.trim() : '';
+    const normalizedTitle = typeof title === 'string' ? title.trim() : '';
+    const normalizedOrderNumber = toInt(orderNumber);
+    const normalizedPrice = toInt(price ?? 0);
+
+    if (!normalizedComicId || !normalizedTitle) {
+      return res.status(400).json({ error: 'comicId and title are required.' });
+    }
+
+    if (!Number.isInteger(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+      return res.status(400).json({ error: 'orderNumber must be a positive integer.' });
+    }
+
+    if (!Number.isInteger(normalizedPrice) || normalizedPrice < 0) {
+      return res.status(400).json({ error: 'price must be an integer >= 0.' });
+    }
+
+    const normalizedImages = Array.isArray(images)
+      ? images.map((url) => String(url || '').trim()).filter(Boolean)
+      : [];
+
+    if (normalizedImages.length === 0) {
+      return res.status(400).json({ error: 'At least one image is required.' });
+    }
+
+    const comic = await prisma.comic.findUnique({
+      where: { id: normalizedComicId },
+      select: { id: true, title: true, authorId: true },
+    });
+
+    if (!comic) {
+      return res.status(404).json({ error: 'Comic not found.' });
+    }
+
+    const isAdmin = req.user.role === 'ADMIN';
+    const isOwner = comic.authorId === req.user.userId;
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: 'You can only add chapters to your own comic.' });
+    }
+
     const existing = await prisma.chapter.findFirst({
-      where: {
-        comicId,
-        orderNumber
-      }
+      where: { comicId: normalizedComicId, orderNumber: normalizedOrderNumber },
+      select: { id: true },
     });
 
     if (existing) {
-      return res.status(400).json({
-        error: "Chương này đã tồn tại (trùng orderNumber)"
-      });
+      return res.status(409).json({ error: 'This chapter order already exists.' });
     }
 
-    const newChapter = await prisma.chapter.create({
-      data: {
-        comicId,
-        title,
-        orderNumber,
-        price: price || 0,
-        images: {
-          create: images.map((url, index) => ({ url, pageNumber: index + 1 }))
-        }
-      },
-      include: { images: true }
-    });
-
-    // --- LOGIC THÔNG BÁO ---
-    const favorites = await prisma.favorite.findMany({
-      where: { comicId },
-      select: { userId: true }
-    });
-
-    if (favorites.length > 0) {
-      const notificationsData = favorites.map(fav => ({
-        userId: fav.userId,
-        title: 'Chương mới phát hành! 🎉',
-        message: `Truyện "${comic.title}" vừa cập nhật ${title}. Vào đọc ngay!`, // Biến comic.title giờ đã an toàn
-        link: `/read/${newChapter.id}`
-      }));
-
-      await prisma.notification.createMany({
-        data: notificationsData
+    const chapter = await prisma.$transaction(async (tx) => {
+      const createdChapter = await tx.chapter.create({
+        data: {
+          comicId: normalizedComicId,
+          title: normalizedTitle,
+          orderNumber: normalizedOrderNumber,
+          price: normalizedPrice,
+          images: {
+            create: normalizedImages.map((url, index) => ({ url, pageNumber: index + 1 })),
+          },
+        },
+        include: {
+          images: { orderBy: { pageNumber: 'asc' } },
+          comic: { select: { id: true, title: true } },
+        },
       });
-    }
 
-    res.status(201).json({ message: 'Thêm chương thành công!', chapter: newChapter });
+      // Keep comic ordering stable for homepage lists ordered by updatedAt.
+      await tx.comic.update({
+        where: { id: normalizedComicId },
+        data: { updatedAt: new Date() },
+      });
+
+      const favorites = await tx.favorite.findMany({
+        where: { comicId: normalizedComicId },
+        select: { userId: true },
+      });
+
+      const notificationPayload = favorites
+        .filter((fav) => fav.userId !== req.user.userId)
+        .map((fav) => ({
+          userId: fav.userId,
+          title: 'New chapter released',
+          message: `"${comic.title}" has a new chapter: ${normalizedTitle}`,
+          link: `/read/${createdChapter.id}`,
+        }));
+
+      if (notificationPayload.length > 0) {
+        await tx.notification.createMany({ data: notificationPayload });
+      }
+
+      return createdChapter;
+    });
+
+    return res.status(201).json({ message: 'Chapter created successfully.', chapter });
   } catch (error) {
-    console.error("Lỗi tạo chương:", error);
-    res.status(500).json({ error: 'Lỗi server khi tạo chương' });
+    console.error('createChapter error:', error);
+    return res.status(500).json({ error: 'Server error while creating chapter.' });
   }
 };
 
-
-
-// ==========================================
-// 2. [GET] Lấy danh sách chương của một bộ truyện
-// ==========================================
 const getChaptersByComic = async (req, res) => {
   try {
     const { comicId } = req.params;
 
-    console.log("📌 Fetch chapters for comic:", comicId);
-
-    // 1️⃣ Kiểm tra comic có tồn tại không
     const comic = await prisma.comic.findUnique({
-      where: { id: comicId }
+      where: { id: comicId },
+      select: { id: true },
     });
 
     if (!comic) {
-      return res.status(404).json({
-        error: "Không tìm thấy truyện",
-        comicId
-      });
+      return res.status(404).json({ error: 'Comic not found.' });
     }
 
-    // 2️⃣ Lấy danh sách chapter
     const chapters = await prisma.chapter.findMany({
-      where: {
-        comicId,
-        status: "PUBLISHED" // chỉ lấy chương hiển thị
-      },
-      orderBy: { orderNumber: "asc" },
+      where: { comicId },
+      orderBy: { orderNumber: 'asc' },
       select: {
         id: true,
         title: true,
         orderNumber: true,
         price: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
-    res.status(200).json(chapters);
-
+    return res.json(chapters);
   } catch (error) {
-    console.error("❌ Lỗi lấy chapter:", error);
-    res.status(500).json({ error: "Lỗi server khi lấy danh sách chương" });
+    console.error('getChaptersByComic error:', error);
+    return res.status(500).json({ error: 'Server error while fetching chapters.' });
   }
 };
 
-// ==========================================
-// 3. [GET] ĐỌC TRUYỆN: Lấy nội dung chi tiết & ảnh (CÓ KIỂM TRA QUYỀN)
-// ==========================================
 const getChapterDetail = async (req, res) => {
   try {
-    const { id } = req.params; // Lấy ID của chương từ URL
+    const { id } = req.params;
 
-    // 1. Tìm chương và lấy kèm toàn bộ hình ảnh, sắp xếp theo số trang
     const chapter = await prisma.chapter.findUnique({
       where: { id },
       include: {
-        comic: true,
-        images: { orderBy: { pageNumber: 'asc' } }
-      }
+        comic: {
+          select: {
+            id: true,
+            title: true,
+            authorId: true,
+            coverUrl: true,
+          },
+        },
+        images: { orderBy: { pageNumber: 'asc' } },
+      },
     });
 
-    if (!chapter) return res.status(404).json({ error: 'Không tìm thấy chương này!' });
-
-    // 2. NẾU MIỄN PHÍ -> Trả về ảnh luôn, không cần check Token
-    if (chapter.price === 0) {
-      return res.json({ message: 'Đọc truyện vui vẻ!', chapter, images: chapter.images });
+    if (!chapter) {
+      return res.status(404).json({ error: 'Chapter not found.' });
     }
 
-    // ==========================================
-    // TỪ ĐÂY TRỞ XUỐNG LÀ XỬ LÝ CHƯƠNG CÓ PHÍ
-    // ==========================================
+    const isFree = chapter.price === 0;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const isOwner = req.user?.userId === chapter.comic.authorId;
 
-    // 3. Kiểm tra xem user có đăng nhập không? (Biến req.user lấy từ optionalAuth)
-    if (!req.user) {
-      return res.status(403).json({ error: 'Đây là chương trả phí (VIP). Vui lòng đăng nhập để đọc!' });
+    if (isFree || isAdmin || isOwner) {
+      return res.json({
+        message: 'Read success.',
+        comic: chapter.comic,
+        chapter,
+        images: chapter.images,
+      });
     }
 
-    // 4. Kiểm tra quyền ưu tiên: Tác giả của truyện đó hoặc Admin thì được xem free
-    const isAuthor = (req.user.role === 'AUTHOR' && chapter.comic.authorId === req.user.userId);
-    const isAdmin = (req.user.role === 'ADMIN');
-
-    if (isAuthor || isAdmin) {
-      return res.json({ message: 'Quyền Tác giả/Admin', chapter, images: chapter.images });
+    if (!req.user?.userId) {
+      return res.status(403).json({
+        error: 'This chapter is paid. Please login first.',
+        requiresAuth: true,
+        chapterId: chapter.id,
+      });
     }
 
-    // 5. Kiểm tra lịch sử mua hàng của Độc giả bình thường
     const hasBought = await prisma.unlockedChapter.findUnique({
       where: {
-        userId_chapterId: { userId: req.user.userId, chapterId: id }
-      }
+        userId_chapterId: { userId: req.user.userId, chapterId: id },
+      },
+      select: { id: true },
     });
 
-    if (hasBought) {
-      return res.json({ message: 'Bạn đã mua chương này. Đọc truyện vui vẻ!', chapter, images: chapter.images });
+    if (!hasBought) {
+      return res.status(403).json({
+        error: 'You have not purchased this chapter yet.',
+        requiresPurchase: true,
+        chapterId: chapter.id,
+        price: chapter.price,
+      });
     }
 
-    // Nếu lọt xuống tận đây có nghĩa là: Có đăng nhập, không phải tác giả, và CHƯA MUA -> Chặn!
-    return res.status(403).json({ error: 'Bạn chưa mua chương này. Vui lòng thanh toán để xem ảnh!' });
-
+    return res.json({
+      message: 'Read success.',
+      comic: chapter.comic,
+      chapter,
+      images: chapter.images,
+    });
   } catch (error) {
-    console.error("Lỗi đọc chương:", error);
-    res.status(500).json({ error: 'Lỗi server khi load nội dung chương' });
+    console.error('getChapterDetail error:', error);
+    return res.status(500).json({ error: 'Server error while fetching chapter detail.' });
   }
 };
 
-// Đảm bảo export đầy đủ 3 hàm ra ngoài
 module.exports = { createChapter, getChaptersByComic, getChapterDetail };

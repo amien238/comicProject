@@ -1,33 +1,37 @@
 const prisma = require('../config/db');
 
-// [GET] Lấy danh sách tất cả các Tags (Để hiển thị ra giao diện cho người dùng chọn)
-const getAllTags = async (req, res) => {
+const getAllTags = async (_req, res) => {
   try {
-    const tags = await prisma.tag.findMany({
-      orderBy: { name: 'asc' }
-    });
-    res.json(tags);
+    const tags = await prisma.tag.findMany({ orderBy: { name: 'asc' } });
+    return res.json(tags);
   } catch (error) {
-    console.error("Lỗi lấy danh sách tags:", error);
-    res.status(500).json({ error: 'Lỗi server khi lấy tags' });
+    console.error('getAllTags error:', error);
+    return res.status(500).json({ error: 'Server error while fetching tags.' });
   }
 };
 
-// [POST] Tạo Tag mới (Dành cho Admin/Hệ thống)
 const createTag = async (req, res) => {
   try {
-    const { name, description } = req.body;
-    
-    if (!name) return res.status(400).json({ error: 'Tên Tag không được để trống' });
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const description = typeof req.body?.description === 'string' ? req.body.description.trim() : null;
+
+    if (!name) {
+      return res.status(400).json({ error: 'name is required.' });
+    }
+
+    const existingTag = await prisma.tag.findUnique({ where: { name } });
+    if (existingTag) {
+      return res.status(409).json({ error: 'Tag already exists.' });
+    }
 
     const newTag = await prisma.tag.create({
-      data: { name, description }
+      data: { name, description },
     });
 
-    res.status(201).json({ message: 'Tạo Tag thành công', tag: newTag });
+    return res.status(201).json({ message: 'Tag created.', tag: newTag });
   } catch (error) {
-    console.error("Lỗi tạo tag:", error);
-    res.status(500).json({ error: 'Tag này có thể đã tồn tại hoặc có lỗi server' });
+    console.error('createTag error:', error);
+    return res.status(500).json({ error: 'Server error while creating tag.' });
   }
 };
 

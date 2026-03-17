@@ -36,7 +36,7 @@ export default function ReadChapter() {
 
           // Lấy danh sách toàn bộ chương để làm nút Next/Prev
           const list = await comicApi.getChapters(data.chapter.comicId);
-          setChapterList(list);
+          setChapterList(Array.isArray(list) ? list : []);
         }
       } catch (err: any) {
         setError(err.message);
@@ -51,9 +51,10 @@ export default function ReadChapter() {
   const handleScroll = useCallback(() => {
     const totalScroll = document.documentElement.scrollTop;
     const windowHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-    const scroll = `${totalScroll / windowHeight}`;
-    
-    setScrollProgress(Number(scroll) * 100);
+    const rawProgress = windowHeight > 0 ? totalScroll / windowHeight : 0;
+    const clampedProgress = Math.max(0, Math.min(rawProgress, 1));
+
+    setScrollProgress(clampedProgress * 100);
 
     // Tùy chọn: Tự động ẩn UI khi cuộn xuống
     if (totalScroll > 100 && showUI) {
@@ -113,7 +114,7 @@ export default function ReadChapter() {
           
           <div className="flex-1 px-4 text-center overflow-hidden">
             <h1 className="text-sm sm:text-base font-bold text-white truncate">
-              {chapterData?.comic?.title || 'Đang đọc truyện'}
+              {chapterData?.chapter?.comic?.title || chapterData?.comic?.title || 'Đang đọc truyện'}
             </h1>
             <p className="text-xs text-blue-400 truncate font-medium">
               {chapterData?.chapter?.title}
