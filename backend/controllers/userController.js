@@ -96,5 +96,21 @@ const getMyFavorites = async (req, res) => {
   }
 };
 
+const getMyHistory = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const history = await prisma.readingHistory.findMany({
+      where: { userId },
+      include: {
+        comic: true, // Quan trọng: Phải lấy comic để Frontend có ảnh bìa/tên
+        chapter: true
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi lấy lịch sử đọc' });
+  }
+};
 
-module.exports = { getMe, getMyUnlockedChapters, getMyFavorites };
+module.exports = { getMe, getMyUnlockedChapters, getMyFavorites, getMyHistory };
