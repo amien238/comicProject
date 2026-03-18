@@ -218,4 +218,130 @@ const getChapterDetail = async (req, res) => {
   }
 };
 
-module.exports = { createChapter, getChaptersByComic, getChapterDetail };
+const updateChapter = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const { id } = req.params;
+    const { title, orderNumber, price, images, imageOrder } = req.body || {};
+
+    const chapter = await prisma.chapter.findUnique({
+      where: { id },
+      include: { comic: { select: { authorId: true } }, images: true },
+    });
+
+    if (!chapter) return res.status(404).json({ error: 'Chapter not found.' });
+
+    const isAdmin = req.user.role === 'ADMIN';
+    const isOwner = chapter.comic.authorId === userId;
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: 'You can only edit your own chapter.' });
+    }
+
+    const payload = {};
+    if (typeof title === 'string' && title.trim()) payload.title = title.trim();
+
+    const normalizedOrderNumber = toInt(orderNumber);
+    if (orderNumber !== undefined) {
+      if (!Number.isInteger(normalizedOrderNumber) || normalizedOrderNumber <= 0) {
+        return res.status(400).json({ error: 'orderNumber must be a positive integer.' });
+      }
+      payload.orderNumber = normalizedOrderNumber;
+    }
+
+    const normalizedPrice = toInt(price);
+    if (price !== undefined) {
+      if (!Number.isInteger(normalizedPrice) || normalizedPrice < 0) {
+        return res.status(400).json({ error: 'price must be an integer >= 0.' });
+      }
+      payload.price = normalizedPrice;
+    }
+
+    const normalizedImages = Array.isArray(images)
+      ? images.map((url) => String(url || '').trim()).filter(Boolean)
+      : null;
+
+    if (Array.isArray(images) && (!normalizedImages || normalizedImages.length === 0)) {
+      return res.status(400).json({ error: 'images cannot be empty.' });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (normalizedImages) {
+        await tx.image.deleteMany({ where: { chapterId: id } });
+        await tx.image.createMany({
+          data: normalizedImages.map((url, index) => ({ chapterId: id, url, pageNumber: index + 1 })),
+        });
+      } else if (Array.isArray(imageOrder) && imageOrder.length > 0) {
+        const existingIds = new Set(chapter.images.map((img) => img.id));
+        const normalizedOrder = imageOrder.map((item) => String(item).trim()).filter(Boolean);
+        if (normalizedOrder.some((imgId) => !existingIds.has(imgId))) {
+          return res.status(400).json({ error: 'imageOrder contains invalid image id.' });
+        }
+
+        await Promise.all(
+          normalizedOrder.map((imgId, index) =>
+            tx.image.update({ where: { id: imgId }, data: { pageNumber: index + 1 } }),
+          ),
+        );
+      }
+
+      const chapterUpdate = await tx.chapter.update({
+        where: { id },
+        data: payload,
+        include: {
+          images: { orderBy: { pageNumber: 'asc' } },
+          comic: { select: { id: true, title: true } },
+        },
+      });
+
+      await tx.comic.update({
+        where: { id: chapterUpdate.comicId },
+        data: { updatedAt: new Date() },
+      });
+
+      return chapterUpdate;
+    });
+
+    return res.json({ message: 'Chapter updated.', chapter: updated });
+  } catch (error) {
+    console.error('updateChapter error:', error);
+    return res.status(500).json({ error: 'Server error while updating chapter.' });
+  }
+};
+
+const deleteChapter = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const { id } = req.params;
+    const chapter = await prisma.chapter.findUnique({
+      where: { id },
+      include: { comic: { select: { id: true, authorId: true } } },
+    });
+
+    if (!chapter) return res.status(404).json({ error: 'Chapter not found.' });
+
+    const isAdmin = req.user.role === 'ADMIN';
+    const isOwner = chapter.comic.authorId === userId;
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: 'You can only delete your own chapter.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.chapter.delete({ where: { id } });
+      await tx.comic.update({
+        where: { id: chapter.comic.id },
+        data: { updatedAt: new Date() },
+      });
+    });
+
+    return res.json({ message: 'Chapter deleted.' });
+  } catch (error) {
+    console.error('deleteChapter error:', error);
+    return res.status(500).json({ error: 'Server error while deleting chapter.' });
+  }
+};
+
+module.exports = { createChapter, getChaptersByComic, getChapterDetail, updateChapter, deleteChapter };

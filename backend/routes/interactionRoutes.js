@@ -8,6 +8,8 @@ router.post('/view/:comicId', interactionController.incrementView);
 router.post('/rate', protect, interactionController.rateComic);
 router.post('/comment', protect, interactionController.addComment);
 router.post('/favorite', protect, interactionController.toggleFavorite);
-router.get('/comment/:comicId', interactionController.getComments);
+router.get('/comment/comic/:comicId', interactionController.getComicComments);
+router.get('/comment/chapter/:chapterId', interactionController.getChapterComments);
+router.get('/comment/:comicId', interactionController.getComments); // backward compatibility
 
 module.exports = router;

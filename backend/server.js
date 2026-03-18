@@ -2,8 +2,10 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const passport = require('passport');
 
 const prisma = require('./config/db');
+const { setupOAuthStrategies } = require('./config/oauth');
 
 const authRoutes = require('./routes/authRoutes');
 const comicRoutes = require('./routes/comicsRoutes');
@@ -21,6 +23,10 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+setupOAuthStrategies();
+app.use(passport.initialize());
 
 app.get('/', (_req, res) => {
   res.send('AmienComic backend is running.');

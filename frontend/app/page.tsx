@@ -1,11 +1,24 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Star, Eye, Zap, TrendingUp, Crown, Bot, X, Send, MessageCircle, Clock, Play } from 'lucide-react';
+import { Star, Eye, Zap, TrendingUp, Crown, Bot, X, Send, MessageCircle, Clock, Play, Heart } from 'lucide-react';
 import Navbar from '../src/components/NavBar';
 import AuthModal from '../src/components/AuthModal';
 import { comicApi, tagApi, aiApi, historyApi } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
+
+// Hàm tính thời gian cập nhật
+const timeAgo = (dateString: string) => {
+  if (!dateString) return '';
+  const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
+  let interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " ngày trước";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " giờ trước";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " phút trước";
+  return "Vừa xong";
+};
 
 export default function Home() {
   const router = useRouter(); 
@@ -31,21 +44,17 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Tải truyện và tags, nếu lỗi thì gán mảng rỗng để chống sập
         const comicsData = await comicApi.getAllComics().catch(() => []);
         const tagsData = await tagApi.getAllTags().catch(() => []);
         
         setComics(Array.isArray(comicsData) ? comicsData : []);
         setTags(Array.isArray(tagsData) ? tagsData : []);
 
-        // NẾU CÓ USER: Tải lịch sử đọc
         if (user) {
           try {
             const history = await historyApi.getMyHistory();
-            // Lớp phòng thủ: Đảm bảo history trả về là mảng thì mới slice
             setRecentHistory(Array.isArray(history) ? history.slice(0, 4) : []); 
           } catch (err) {
-            console.error("Lỗi lấy lịch sử đọc:", err);
             setRecentHistory([]);
           }
         }
@@ -58,7 +67,6 @@ export default function Home() {
     fetchData();
   }, [user]);
 
-  // Tự động cuộn xuống cuối khi có tin nhắn mới
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isBotTyping]);
@@ -76,7 +84,6 @@ export default function Home() {
     setChatInput('');
     setIsBotTyping(true);
     try {
-      // Chỉ gửi nội dung chat (bỏ câu chào mặc định đầu tiên nếu cần)
       const formattedHistory = chatMessages.slice(1).map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'model',
         parts: [{ text: msg.text }]
@@ -166,22 +173,35 @@ export default function Home() {
            ))}
         </div>
 
-        {/* Danh Sách Truyện */}
+        {/* Danh Sách Truyện Đã Sửa Lại Lớp Hiển Thị Mới */}
         {loading ? (
           <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div></div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
             {displayComics.map(comic => (
-              <div key={comic.id} onClick={() => router.push(`/comic/${comic.id}`)} className="group cursor-pointer">
-                <div className="aspect-[2/3] relative rounded-xl overflow-hidden border border-slate-700 mb-2">
-                  <img src={comic.coverUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="cover" />
-                  <div className="absolute top-2 right-2 bg-black/70 px-1.5 py-0.5 rounded text-xs text-yellow-400 flex items-center"><Star size={10} className="mr-1 fill-yellow-400"/> {comic.averageRating || '5.0'}</div>
+              <div key={comic.id} onClick={() => router.push(`/comic/${comic.id}`)} className="group cursor-pointer relative">
+                <div className="aspect-[2/3] relative rounded-xl overflow-hidden border border-slate-700 mb-2 bg-slate-800">
+                  <img src={comic.coverUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="cover" />
+                  
+                  {/* Nhãn Đánh giá & Yêu thích */}
+                  <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                    <div className="bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-yellow-400 flex items-center">
+                      <Star size={10} className="mr-1 fill-yellow-400"/> {comic.averageRating || '5.0'}
+                    </div>
+                  </div>
+
+                  {/* Nhãn thời gian & thông số */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent pt-8 pb-2 px-2">
+                     <p className="text-[10px] text-white flex justify-between items-center font-bold">
+                       <span>{timeAgo(comic.updatedAt || comic.createdAt)}</span>
+                       <span className="flex items-center gap-2">
+                         <span className="flex items-center text-blue-300"><Eye size={10} className="mr-1"/>{comic.views || 0}</span>
+                         <span className="flex items-center text-pink-400"><Heart size={10} className="mr-1 fill-current"/>{comic.favoriteCount || comic._count?.favorites || 0}</span>
+                       </span>
+                     </p>
+                  </div>
                 </div>
-                <h3 className="font-bold text-sm line-clamp-2 group-hover:text-blue-400">{comic.title}</h3>
-                <p className="text-xs text-slate-500 mt-1 flex justify-between">
-                  <span className="truncate">{comic.author?.name || 'Đang cập nhật'}</span>
-                  <span className="flex items-center"><Eye size={12} className="mr-1"/>{comic.views || 0}</span>
-                </p>
+                <h3 className="font-bold text-sm line-clamp-2 group-hover:text-blue-400 transition-colors leading-tight">{comic.title}</h3>
               </div>
             ))}
           </div>

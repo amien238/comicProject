@@ -33,6 +33,14 @@ const isAuthor = (req, res, next) => {
   return next();
 };
 
+const isAccounter = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'ACCOUNTER' && req.user.role !== 'ADMIN')) {
+    return res.status(403).json({ error: 'Accounter or admin permission required.' });
+  }
+
+  return next();
+};
+
 const optionalAuth = (req, _res, next) => {
   const token = getBearerToken(req);
   if (!token) return next();
@@ -43,4 +51,4 @@ const optionalAuth = (req, _res, next) => {
   });
 };
 
-module.exports = { protect, isAuthor, optionalAuth };
+module.exports = { protect, isAuthor, isAccounter, optionalAuth };

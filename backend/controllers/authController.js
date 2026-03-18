@@ -4,6 +4,7 @@ const prisma = require('../config/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret_tam_thoi';
 const REGISTERABLE_ROLES = new Set(['USER', 'AUTHOR']);
+const SOCIAL_PROVIDERS = new Set(['google', 'facebook', 'apple']);
 
 const register = async (req, res) => {
   try {
@@ -98,4 +99,63 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login };
+const socialAuth = async (req, res) => {
+  try {
+    const { provider, email, name, avatar } = req.body || {};
+
+    if (!SOCIAL_PROVIDERS.has(provider)) {
+      return res.status(400).json({ error: 'Unsupported social provider.' });
+    }
+
+    if (!email || !name) {
+      return res.status(400).json({ error: 'email and name are required.' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const normalizedName = String(name).trim();
+    const normalizedAvatar = typeof avatar === 'string' && avatar.trim() ? avatar.trim() : null;
+
+    if (!normalizedEmail || !normalizedName) {
+      return res.status(400).json({ error: 'Invalid email or name.' });
+    }
+
+    let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          name: normalizedName,
+          avatar: normalizedAvatar,
+          role: 'USER',
+        },
+      });
+    } else if (!user.avatar && normalizedAvatar) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { avatar: normalizedAvatar },
+      });
+    }
+
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+
+    return res.json({
+      message: `Social login success (${provider}).`,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        points: user.points,
+        totalDeposited: user.totalDeposited,
+        avatar: user.avatar,
+      },
+    });
+  } catch (error) {
+    console.error('socialAuth error:', error);
+    return res.status(500).json({ error: 'Server error while social login.' });
+  }
+};
+
+module.exports = { register, login, socialAuth };
