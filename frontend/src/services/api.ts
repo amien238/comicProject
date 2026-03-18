@@ -23,13 +23,28 @@ const handleResponse = async (res: Response) => {
 };
 
 export const comicApi = {
-  getAllComics: async () => {
-    const res = await fetch(`${BASE_URL}/comics`);
+  getAllComics: async (query?: { search?: string; includeHidden?: boolean; authorOnly?: boolean; status?: string }) => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const params = new URLSearchParams();
+    if (query?.search) params.set('search', query.search);
+    if (query?.includeHidden) params.set('includeHidden', 'true');
+    if (query?.authorOnly) params.set('authorOnly', 'true');
+    if (query?.status) params.set('status', query.status);
+
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${BASE_URL}/comics${suffix}`, { headers });
     return handleResponse(res);
   },
 
   getComicById: async (id: string) => {
-    const res = await fetch(`${BASE_URL}/comics/${id}`);
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE_URL}/comics/${id}`, { headers });
     return handleResponse(res);
   },
 
@@ -38,8 +53,16 @@ export const comicApi = {
     return handleResponse(res);
   },
 
-  getChapters: async (comicId: string) => {
-    const res = await fetch(`${BASE_URL}/chapters/comic/${comicId}`);
+  getChapters: async (comicId: string, query?: { includeHidden?: boolean }) => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const params = new URLSearchParams();
+    if (query?.includeHidden) params.set('includeHidden', 'true');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const res = await fetch(`${BASE_URL}/chapters/comic/${comicId}${suffix}`, { headers });
     return handleResponse(res);
   },
 
@@ -93,6 +116,37 @@ export const transactionApi = {
     return handleResponse(res);
   },
 
+  createPaymentOrder: async (payload: {
+    amount: number;
+    method: 'BANK_TRANSFER' | 'EWALLET';
+    provider?: string;
+    accountTarget?: string;
+    note?: string;
+    expiresMinutes?: number;
+  }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/transactions/payment/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  getMyPaymentOrders: async (limit = 30) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/transactions/payment/orders/me?limit=${encodeURIComponent(String(limit))}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return handleResponse(res);
+  },
+
   reviewDepositRequest: async (payload: { transactionId: string; approve: boolean }) => {
     const token = getToken();
     if (!token) throw new Error('Vui long dang nhap');
@@ -129,6 +183,105 @@ export const transactionApi = {
     if (query?.limit) params.set('limit', String(query.limit));
 
     const res = await fetch(`${BASE_URL}/transactions/audit?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  requestWithdraw: async (payload: {
+    amount: number;
+    method: 'BANK_TRANSFER' | 'EWALLET';
+    accountName?: string;
+    accountNumber: string;
+    note?: string;
+  }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/transactions/withdraw/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  reviewWithdrawRequest: async (payload: {
+    transactionId: string;
+    approve: boolean;
+    payoutReference?: string;
+    reviewNote?: string;
+  }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/transactions/withdraw/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  getPaymentOrders: async (query?: { status?: string; method?: string; userId?: string; limit?: number }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const params = new URLSearchParams();
+    if (query?.status) params.set('status', query.status);
+    if (query?.method) params.set('method', query.method);
+    if (query?.userId) params.set('userId', query.userId);
+    if (query?.limit) params.set('limit', String(query.limit));
+
+    const res = await fetch(`${BASE_URL}/transactions/payment/orders?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  getReconciliation: async (query?: { status?: string; provider?: string; unmatchedOnly?: boolean; limit?: number }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const params = new URLSearchParams();
+    if (query?.status) params.set('status', query.status);
+    if (query?.provider) params.set('provider', query.provider);
+    if (query?.unmatchedOnly) params.set('unmatchedOnly', 'true');
+    if (query?.limit) params.set('limit', String(query.limit));
+
+    const res = await fetch(`${BASE_URL}/transactions/reconciliation?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  closePeriod: async (payload: { year?: number; month?: number; note?: string }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/transactions/period/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  getAccountingSummary: async (query?: { year?: number; month?: number }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const params = new URLSearchParams();
+    if (query?.year) params.set('year', String(query.year));
+    if (query?.month) params.set('month', String(query.month));
+
+    const res = await fetch(`${BASE_URL}/transactions/accounting/summary?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -231,6 +384,18 @@ export const interactionApi = {
     return handleResponse(res);
   },
 
+  reportComment: async (commentId: string) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/interactions/comment/${commentId}/report`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return handleResponse(res);
+  },
+
   rateComic: async (comicId: string, score: number) => {
     const token = getToken();
     if (!token) throw new Error('Vui long dang nhap');
@@ -266,8 +431,68 @@ export const userApi = {
 };
 
 export const tagApi = {
-  getAllTags: async () => {
-    const res = await fetch(`${BASE_URL}/tags`);
+  getAllTags: async (query?: { includeHidden?: boolean }) => {
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const params = new URLSearchParams();
+    if (query?.includeHidden) params.set('includeHidden', 'true');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const res = await fetch(`${BASE_URL}/tags${suffix}`, { headers });
+    return handleResponse(res);
+  },
+
+  getMyTags: async () => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/tags/mine`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  createTag: async (payload: { name: string; description?: string }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  updateTag: async (
+    id: string,
+    payload: { name?: string; description?: string; status?: 'ACTIVE' | 'HIDDEN'; isOfficial?: boolean },
+  ) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/tags/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  deleteTag: async (id: string) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/tags/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
     return handleResponse(res);
   },
 };
@@ -286,9 +511,10 @@ export const uploadApi = {
     return handleResponse(res);
   },
 
-  uploadMultiple: async (files: FileList) => {
+  uploadMultiple: async (files: FileList | File[]) => {
     const formData = new FormData();
-    for (let i = 0; i < files.length; i += 1) formData.append('images', files[i]);
+    const normalizedFiles = Array.isArray(files) ? files : Array.from(files);
+    for (let i = 0; i < normalizedFiles.length; i += 1) formData.append('images', normalizedFiles[i]);
 
     const res = await fetch(`${BASE_URL}/upload/multiple`, {
       method: 'POST',
@@ -301,11 +527,41 @@ export const uploadApi = {
 };
 
 export const authorApi = {
+  getMyComics: async () => {
+    const token = getToken();
+    if (!token) throw new Error('Vui long dang nhap');
+
+    const res = await fetch(`${BASE_URL}/comics/mine/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return handleResponse(res);
+  },
+
   createComic: async (data: any) => {
     const res = await fetch(`${BASE_URL}/comics`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
       body: JSON.stringify(data),
+    });
+
+    return handleResponse(res);
+  },
+
+  updateComic: async (comicId: string, data: any) => {
+    const res = await fetch(`${BASE_URL}/comics/${comicId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse(res);
+  },
+
+  deleteComic: async (comicId: string) => {
+    const res = await fetch(`${BASE_URL}/comics/${comicId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getToken()}` },
     });
 
     return handleResponse(res);
@@ -320,42 +576,194 @@ export const authorApi = {
 
     return handleResponse(res);
   },
+
+  updateChapter: async (chapterId: string, data: any) => {
+    const res = await fetch(`${BASE_URL}/chapters/${chapterId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse(res);
+  },
+
+  deleteChapter: async (chapterId: string) => {
+    const res = await fetch(`${BASE_URL}/chapters/${chapterId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    return handleResponse(res);
+  },
 };
 
 export const adminApi = {
+  getOverview: async () => {
+    const res = await fetch(`${BASE_URL}/admin/overview`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    return handleResponse(res);
+  },
+
   getStats: async () => {
-    const res = await fetch(`${BASE_URL}/admin/stats`, {
+    return adminApi.getOverview();
+  },
+
+  getAuthors: async (query?: { search?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.search) params.set('search', query.search);
+    if (query?.limit) params.set('limit', String(query.limit));
+
+    const res = await fetch(`${BASE_URL}/admin/authors?${params.toString()}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
 
     return handleResponse(res);
   },
 
-  getUsers: async () => {
-    const res = await fetch(`${BASE_URL}/admin/users`, {
+  getComics: async (query?: { status?: string; authorId?: string; search?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.status) params.set('status', query.status);
+    if (query?.authorId) params.set('authorId', query.authorId);
+    if (query?.search) params.set('search', query.search);
+    if (query?.limit) params.set('limit', String(query.limit));
+
+    const res = await fetch(`${BASE_URL}/admin/comics?${params.toString()}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
 
     return handleResponse(res);
   },
 
-  updateUserRole: async (userId: string, role: string) => {
-    const res = await fetch(`${BASE_URL}/admin/users/role`, {
-      method: 'PUT',
+  moderateComic: async (
+    comicId: string,
+    payload: { status: 'PUBLISHED' | 'HIDDEN' | 'ARCHIVED'; hiddenReason?: string; violationNote?: string; reason?: string },
+  ) => {
+    const res = await fetch(`${BASE_URL}/admin/comics/${comicId}/moderate`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-      body: JSON.stringify({ userId, role }),
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  getComments: async (query?: {
+    status?: string;
+    comicId?: string;
+    chapterId?: string;
+    search?: string;
+    reportedOnly?: boolean;
+    limit?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (query?.status) params.set('status', query.status);
+    if (query?.comicId) params.set('comicId', query.comicId);
+    if (query?.chapterId) params.set('chapterId', query.chapterId);
+    if (query?.search) params.set('search', query.search);
+    if (query?.reportedOnly) params.set('reportedOnly', 'true');
+    if (query?.limit) params.set('limit', String(query.limit));
+
+    const res = await fetch(`${BASE_URL}/admin/comments?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  moderateComment: async (
+    commentId: string,
+    payload: {
+      status: 'VISIBLE' | 'HIDDEN' | 'DELETED';
+      moderationNote?: string;
+      reason?: string;
+      warnUser?: boolean;
+      suspendUser?: boolean;
+    },
+  ) => {
+    const res = await fetch(`${BASE_URL}/admin/comments/${commentId}/moderate`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  getUsers: async (query?: { search?: string; role?: string; suspended?: boolean; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.search) params.set('search', query.search);
+    if (query?.role) params.set('role', query.role);
+    if (query?.suspended !== undefined) params.set('suspended', String(query.suspended));
+    if (query?.limit) params.set('limit', String(query.limit));
+
+    const res = await fetch(`${BASE_URL}/admin/users?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  getUserHistory: async (userId: string) => {
+    const res = await fetch(`${BASE_URL}/admin/users/${userId}/history`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  updateUserStatus: async (
+    userId: string,
+    payload: { isSuspended?: boolean; warningCount?: number; warningDelta?: number; reason?: string },
+  ) => {
+    const res = await fetch(`${BASE_URL}/admin/users/${userId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
+
+  updateUserRole: async (userId: string, role: string, reason?: string) => {
+    const res = await fetch(`${BASE_URL}/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ role, reason }),
+    });
+
+    return handleResponse(res);
+  },
+
+  getTags: async (query?: { status?: string; creatorId?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.status) params.set('status', query.status);
+    if (query?.creatorId) params.set('creatorId', query.creatorId);
+    if (query?.limit) params.set('limit', String(query.limit));
+
+    const res = await fetch(`${BASE_URL}/admin/tags?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    return handleResponse(res);
+  },
+
+  updateTag: async (
+    tagId: string,
+    payload: { status?: 'ACTIVE' | 'HIDDEN'; isOfficial?: boolean; description?: string; name?: string; reason?: string },
+  ) => {
+    const res = await fetch(`${BASE_URL}/admin/tags/${tagId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify(payload),
     });
 
     return handleResponse(res);
   },
 
   deleteComic: async (comicId: string) => {
-    const res = await fetch(`${BASE_URL}/admin/comics/${comicId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-
-    return handleResponse(res);
+    return adminApi.moderateComic(comicId, { status: 'ARCHIVED', reason: 'Archived by admin' });
   },
 };
 

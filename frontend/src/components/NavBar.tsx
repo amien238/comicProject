@@ -5,6 +5,7 @@ import { Bell, BookOpen, Coins, LogOut, Search, User } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import { notificationApi } from '../services/api';
+import { resolveUserTier } from '../utils/userTier';
 
 interface NavbarProps {
   onGoHome: () => void;
@@ -23,6 +24,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   const unreadCount = useMemo(() => notifications.filter((item) => !item.isRead).length, [notifications]);
+  const tier = useMemo(() => resolveUserTier(user?.role, user?.totalDeposited), [user?.role, user?.totalDeposited]);
 
   useEffect(() => {
     if (!user) {
@@ -119,6 +121,24 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                 </button>
               )}
 
+              {(user.role === 'ACCOUNTER' || user.role === 'ADMIN') && (
+                <button
+                  onClick={() => router.push('/accounting')}
+                  className="hidden sm:block bg-gradient-to-r from-cyan-600 to-sky-500 hover:from-cyan-500 hover:to-sky-400 text-white px-4 py-1.5 rounded-full font-bold text-sm shadow-lg transition-all"
+                >
+                  Accounting
+                </button>
+              )}
+
+              {user.role === 'ADMIN' && (
+                <button
+                  onClick={() => router.push('/admin')}
+                  className="hidden sm:block bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white px-4 py-1.5 rounded-full font-bold text-sm shadow-lg transition-all"
+                >
+                  Dashboard Admin
+                </button>
+              )}
+
               <div className="relative" ref={panelRef}>
                 <button
                   onClick={handleOpenNotification}
@@ -179,7 +199,10 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                 <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-full flex items-center justify-center font-bold">
                   {user.name?.charAt(0).toUpperCase()}
                 </div>
-                <span className="hidden sm:block font-medium">{user.name}</span>
+                <div className="hidden sm:flex flex-col leading-tight">
+                  <span className="font-medium">{user.name}</span>
+                  {tier && <span className={`text-[10px] px-1.5 py-0.5 rounded ${tier.className}`}>{tier.label}</span>}
+                </div>
               </div>
 
               <button

@@ -18,20 +18,7 @@ import Navbar from '../../../src/components/NavBar';
 import AuthModal from '../../../src/components/AuthModal';
 import { comicApi, interactionApi, transactionApi, userApi } from '../../../src/services/api';
 import { useAuth } from '../../../src/context/AuthContext';
-
-const getUserBadge = (role: string, totalDeposited: number) => {
-  if (role === 'ADMIN') return { name: 'QTV', style: 'bg-red-500 text-white' };
-  if (role === 'AUTHOR') return { name: 'Tac gia', style: 'bg-purple-500 text-white' };
-
-  const total = totalDeposited || 0;
-  if (total >= 5000000) return { name: 'Phu ba', style: 'bg-yellow-400 text-black font-black' };
-  if (total >= 2000000) return { name: 'Cap 5', style: 'bg-orange-500 text-white' };
-  if (total >= 1000000) return { name: 'Cap 4', style: 'bg-pink-500 text-white' };
-  if (total >= 500000) return { name: 'Cap 3', style: 'bg-blue-500 text-white' };
-  if (total >= 200000) return { name: 'Cap 2', style: 'bg-green-500 text-white' };
-  if (total >= 50000) return { name: 'Cap 1', style: 'bg-slate-500 text-white' };
-  return null;
-};
+import { resolveUserTier } from '../../../src/utils/userTier';
 
 const renderStars = (
   value: number,
@@ -186,7 +173,7 @@ export default function ComicDetail() {
     }
   };
 
-  const handlePostComment = async (e: React.FormEvent, parentId?: string) => {
+  const handlePostComment = async (e: React.FormEvent | React.MouseEvent, parentId?: string) => {
     e.preventDefault();
 
     if (!user) return setShowAuthModal(true);
@@ -214,6 +201,18 @@ export default function ComicDetail() {
       alert(error.message || 'Gui binh luan that bai');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleReportComment = async (commentId: string) => {
+    if (!user) return setShowAuthModal(true);
+    if (!window.confirm('Bao cao binh luan nay?')) return;
+
+    try {
+      await interactionApi.reportComment(commentId);
+      alert('Da gui bao cao.');
+    } catch (error: any) {
+      alert(error.message || 'Khong the bao cao binh luan');
     }
   };
 
@@ -388,7 +387,7 @@ export default function ComicDetail() {
               <div className="text-center py-10 text-slate-500 italic">Chua co binh luan nao.</div>
             ) : (
               comments.map((cmt: any) => {
-                const badge = getUserBadge(cmt.user?.role, cmt.user?.totalDeposited);
+                const badge = resolveUserTier(cmt.user?.role, cmt.user?.totalDeposited);
                 return (
                   <div key={cmt.id}>
                     <div className="flex gap-4">
@@ -401,8 +400,8 @@ export default function ComicDetail() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-sm text-blue-400">{cmt.user?.name || 'Doc gia'}</span>
                               {badge && (
-                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${badge.style}`}>
-                                  {badge.name}
+                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${badge.className}`}>
+                                  {badge.label}
                                 </span>
                               )}
                             </div>
@@ -411,13 +410,22 @@ export default function ComicDetail() {
                           <p className="text-slate-300 text-sm">{cmt.content}</p>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setReplyingTo(replyingTo === cmt.id ? null : cmt.id)}
-                          className="text-[11px] font-black text-slate-500 hover:text-blue-400 flex items-center gap-1.5 transition-colors mt-2 ml-2"
-                        >
-                          <Reply size={12} /> TRA LOI
-                        </button>
+                        <div className="mt-2 ml-2 flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setReplyingTo(replyingTo === cmt.id ? null : cmt.id)}
+                            className="text-[11px] font-black text-slate-500 hover:text-blue-400 flex items-center gap-1.5 transition-colors"
+                          >
+                            <Reply size={12} /> TRA LOI
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReportComment(cmt.id)}
+                            className="text-[11px] font-black text-slate-500 hover:text-red-400 transition-colors"
+                          >
+                            BAO CAO
+                          </button>
+                        </div>
 
                         {replyingTo === cmt.id && (
                           <div className="mt-3 ml-6 flex gap-2">
@@ -443,7 +451,7 @@ export default function ComicDetail() {
                         {(cmt.replies || []).length > 0 && (
                           <div className="mt-4 ml-6 sm:ml-10 border-l-2 border-slate-800 pl-4 space-y-4">
                             {cmt.replies.map((reply: any) => {
-                              const rBadge = getUserBadge(reply.user?.role, reply.user?.totalDeposited);
+                              const rBadge = resolveUserTier(reply.user?.role, reply.user?.totalDeposited);
                               return (
                                 <div key={reply.id} className="flex gap-3">
                                   <div className="w-8 h-8 bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center text-[10px] font-bold text-slate-500 shrink-0">
@@ -453,8 +461,8 @@ export default function ComicDetail() {
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="font-bold text-xs text-slate-400">{reply.user?.name || 'Doc gia'}</span>
                                       {rBadge && (
-                                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${rBadge.style}`}>
-                                          {rBadge.name}
+                                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${rBadge.className}`}>
+                                          {rBadge.label}
                                         </span>
                                       )}
                                     </div>

@@ -18,6 +18,7 @@ const tagsRoutes = require('./routes/tagsRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const historyRoutes = require('./routes/historyRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });

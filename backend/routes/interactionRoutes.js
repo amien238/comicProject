@@ -7,6 +7,7 @@ const { protect } = require('../middleware/auth');
 router.post('/view/:comicId', interactionController.incrementView);
 router.post('/rate', protect, interactionController.rateComic);
 router.post('/comment', protect, interactionController.addComment);
+router.post('/comment/:id/report', protect, interactionController.reportComment);
 router.post('/favorite', protect, interactionController.toggleFavorite);
 router.get('/comment/comic/:comicId', interactionController.getComicComments);
 router.get('/comment/chapter/:chapterId', interactionController.getChapterComments);

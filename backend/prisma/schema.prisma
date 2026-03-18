@@ -14,6 +14,48 @@ enum Role {
   ACCOUNTER
 }
 
+enum ComicStatus {
+  PUBLISHED
+  HIDDEN
+  ARCHIVED
+}
+
+enum ChapterStatus {
+  PUBLISHED
+  HIDDEN
+  ARCHIVED
+}
+
+enum CommentStatus {
+  VISIBLE
+  HIDDEN
+  DELETED
+}
+
+enum TagStatus {
+  ACTIVE
+  HIDDEN
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  EWALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELED
+  EXPIRED
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  CLOSED
+}
+
 model User {
   id             String    @id @default(uuid())
   email          String    @unique
@@ -23,6 +65,8 @@ model User {
   role           Role      @default(USER)
   points         Int       @default(0)
   totalDeposited Int       @default(0)
+  warningCount   Int       @default(0)
+  isSuspended    Boolean   @default(false)
   createdAt      DateTime  @default(now())
 
   comics           Comic[]
@@ -33,6 +77,15 @@ model User {
   readingHistories ReadingHistory[]
   notifications    Notification[]
   ratings          Rating[]
+  createdTags      Tag[]             @relation("TagCreator")
+  paymentOrders    PaymentOrder[]
+  journalEntries   JournalEntry[]    @relation("JournalEntryCreator")
+  journalLines     JournalLine[]
+  closedPeriods    AccountingPeriod[] @relation("PeriodCloser")
+  reconciledEvents ReconciliationEvent[] @relation("ReconciledBy")
+  moderationActions ModerationAction[]
+  actorAuditLogs   UserAuditLog[]    @relation("AuditActor")
+  targetAuditLogs  UserAuditLog[]    @relation("AuditTarget")
 }
 
 model Comic {
@@ -43,6 +96,9 @@ model Comic {
   coverUrl      String
   views         Int      @default(0)
   averageRating Float    @default(0)
+  status        ComicStatus @default(PUBLISHED)
+  hiddenReason  String?
+  violationNote String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt // THÊM CỘT NÀY ĐỂ FIX LỖI DATABASE
 
@@ -61,6 +117,8 @@ model Chapter {
   title       String
   orderNumber Int
   price       Int      @default(0)
+  status      ChapterStatus @default(PUBLISHED)
+  hiddenReason String?
   createdAt   DateTime @default(now())
 
   comic            Comic             @relation(fields: [comicId], references: [id], onDelete: Cascade)
@@ -75,6 +133,9 @@ model Image { // ĐÃ ĐỔI TÊN TỪ ChapterImage -> Image
   chapterId  String
   url        String
   pageNumber Int
+  originalName String?
+  normalizedName String?
+  storageKey String?
 
   chapter    Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 }
@@ -86,6 +147,9 @@ model Comment {
   chapterId String?
   parentId  String?  // DÙNG CHO REPLY
   content   String
+  status    CommentStatus @default(VISIBLE)
+  moderationNote String?
+  reportedCount Int @default(0)
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -101,7 +165,11 @@ model Tag {
   id          String   @id @default(uuid())
   name        String   @unique
   description String?
+  createdById String?
+  status      TagStatus @default(ACTIVE)
+  isOfficial  Boolean   @default(false)
   comics      Comic[]
+  createdBy   User?     @relation("TagCreator", fields: [createdById], references: [id], onDelete: SetNull)
 }
 
 model Transaction {
@@ -110,6 +178,10 @@ model Transaction {
   amount      Int
   type        String
   description String
+  status      String   @default("SUCCESS")
+  referenceCode String?
+  paymentOrderId String?
+  metadata    Json?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
 }
@@ -151,9 +223,11 @@ model ReadingHistory {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
+  type      String   @default("SYSTEM")
   title     String
   message   String
   link      String?
+  metadata  Json?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -167,4 +241,119 @@ model UnlockedChapter {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   @@unique([userId, chapterId])
+}
+
+model PaymentOrder {
+  id                String        @id @default(uuid())
+  userId            String
+  amount            Int
+  method            PaymentMethod
+  provider          String
+  providerOrderId   String?       @unique
+  providerTxnId     String?       @unique
+  bankReferenceCode String?       @unique
+  checkoutUrl       String?
+  qrContent         String?
+  status            PaymentStatus @default(PENDING)
+  webhookPayload    Json?
+  metadata          Json?
+  transactionId     String?
+  paidAt            DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reconciliationEvents ReconciliationEvent[] @relation("OrderReconciliation")
+}
+
+model AccountingPeriod {
+  id         String                 @id @default(uuid())
+  year       Int
+  month      Int
+  status     AccountingPeriodStatus @default(OPEN)
+  note       String?
+  closedById String?
+  closedAt   DateTime?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  closedBy User? @relation("PeriodCloser", fields: [closedById], references: [id], onDelete: SetNull)
+  entries  JournalEntry[]
+
+  @@unique([year, month])
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid())
+  entryCode   String   @unique
+  periodId    String
+  description String
+  sourceType  String
+  sourceId    String?
+  createdById String?
+  postedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  period    AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  createdBy User?            @relation("JournalEntryCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines     JournalLine[]
+}
+
+model JournalLine {
+  id          String   @id @default(uuid())
+  entryId     String
+  accountCode String
+  userId      String?
+  debit       Int      @default(0)
+  credit      Int      @default(0)
+  note        String?
+  createdAt   DateTime @default(now())
+
+  entry JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user  User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model ReconciliationEvent {
+  id               String   @id @default(uuid())
+  provider         String
+  providerOrderId  String?
+  providerTxnId    String?
+  amount           Int
+  status           String
+  payload          Json?
+  matchedOrderId   String?
+  matchedById      String?
+  reconciliationNote String?
+  receivedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  matchedOrder PaymentOrder? @relation("OrderReconciliation", fields: [matchedOrderId], references: [id], onDelete: SetNull)
+  matchedBy    User?         @relation("ReconciledBy", fields: [matchedById], references: [id], onDelete: SetNull)
+}
+
+model ModerationAction {
+  id          String   @id @default(uuid())
+  targetType  String
+  targetId    String
+  action      String
+  reason      String?
+  performedBy String
+  createdAt   DateTime @default(now())
+
+  actor User @relation(fields: [performedBy], references: [id], onDelete: Cascade)
+}
+
+model UserAuditLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  targetUserId String?
+  action       String
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  actor      User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  targetUser User? @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
 }

@@ -15,20 +15,7 @@ import {
 
 import { comicApi, historyApi, interactionApi, userApi } from '../../../src/services/api';
 import { useAuth } from '../../../src/context/AuthContext';
-
-const getUserBadge = (role: string, totalDeposited: number) => {
-  if (role === 'ADMIN') return { name: 'QTV', style: 'bg-red-500 text-white' };
-  if (role === 'AUTHOR') return { name: 'Tac gia', style: 'bg-purple-500 text-white' };
-
-  const total = totalDeposited || 0;
-  if (total >= 5000000) return { name: 'Phu ba', style: 'bg-yellow-400 text-black font-black' };
-  if (total >= 2000000) return { name: 'Cap 5', style: 'bg-orange-500 text-white' };
-  if (total >= 1000000) return { name: 'Cap 4', style: 'bg-pink-500 text-white' };
-  if (total >= 500000) return { name: 'Cap 3', style: 'bg-blue-500 text-white' };
-  if (total >= 200000) return { name: 'Cap 2', style: 'bg-green-500 text-white' };
-  if (total >= 50000) return { name: 'Cap 1', style: 'bg-slate-500 text-white' };
-  return null;
-};
+import { resolveUserTier } from '../../../src/utils/userTier';
 
 export default function ReadChapter() {
   const params = useParams();
@@ -49,6 +36,8 @@ export default function ReadChapter() {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [commentText, setCommentText] = useState('');
+  const [replyText, setReplyText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [commentLoading, setCommentLoading] = useState(false);
 
   const [isFavorite, setIsFavorite] = useState(false);
@@ -157,28 +146,58 @@ export default function ReadChapter() {
     }
   };
 
-  const handlePostComment = async (e: React.FormEvent) => {
+  const handlePostComment = async (e: React.FormEvent | React.MouseEvent, parentId?: string) => {
     e.preventDefault();
     if (!user) {
       alert('Vui long dang nhap de binh luan');
       return;
     }
 
-    if (!commentText.trim() || commentLoading) return;
+    const payloadContent = parentId ? replyText : commentText;
+    if (!payloadContent.trim() || commentLoading) return;
 
     setCommentLoading(true);
     try {
       const result = await interactionApi.addComment({
         chapterId,
-        content: commentText,
+        content: payloadContent,
+        parentId,
       });
 
-      setComments((prev) => [{ ...result.comment, replies: [] }, ...prev]);
-      setCommentText('');
+      if (parentId) {
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === parentId
+              ? { ...comment, replies: [...(comment.replies || []), result.comment] }
+              : comment,
+          ),
+        );
+        setReplyText('');
+        setReplyingTo(null);
+      } else {
+        setComments((prev) => [{ ...result.comment, replies: [] }, ...prev]);
+        setCommentText('');
+      }
     } catch (err: any) {
       alert(err.message || 'Gui binh luan that bai');
     } finally {
       setCommentLoading(false);
+    }
+  };
+
+  const handleReportComment = async (commentId: string) => {
+    if (!user) {
+      alert('Vui long dang nhap de bao cao');
+      return;
+    }
+
+    if (!window.confirm('Bao cao binh luan nay?')) return;
+
+    try {
+      await interactionApi.reportComment(commentId);
+      alert('Da gui bao cao.');
+    } catch (err: any) {
+      alert(err.message || 'Khong the bao cao');
     }
   };
 
@@ -366,28 +385,71 @@ export default function ReadChapter() {
                             <div className="text-xs text-slate-300 mb-1 flex items-center gap-2">
                               <span>{comment.user?.name || 'Doc gia'}</span>
                               {(() => {
-                                const badge = getUserBadge(comment.user?.role, comment.user?.totalDeposited);
+                                const badge = resolveUserTier(comment.user?.role, comment.user?.totalDeposited);
                                 if (!badge) return null;
                                 return (
-                                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${badge.style}`}>
-                                    {badge.name}
+                                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${badge.className}`}>
+                                    {badge.label}
                                   </span>
                                 );
                               })()}
                             </div>
                             <div className="text-sm text-slate-100">{comment.content}</div>
+
+                            <button
+                              type="button"
+                              onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                              className="mt-2 text-[11px] font-bold text-slate-400 hover:text-blue-400"
+                            >
+                              Tra loi
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReportComment(comment.id)}
+                              className="mt-2 ml-3 text-[11px] font-bold text-slate-400 hover:text-red-400"
+                            >
+                              Bao cao
+                            </button>
+
+                            {replyingTo === comment.id && (
+                              <div className="mt-2 flex gap-2">
+                                <input
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  placeholder={`Tra loi ${comment.user?.name || 'thanh vien'}...`}
+                                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!replyText.trim() || commentLoading}
+                                  onClick={(e) => handlePostComment(e, comment.id)}
+                                  className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50"
+                                >
+                                  Gui
+                                </button>
+                              </div>
+                            )}
+
                             {(comment.replies || []).length > 0 && (
                               <div className="mt-2 pl-3 border-l border-slate-700 space-y-2">
-                                {comment.replies.map((reply: any) => (
-                                  <div key={reply.id} className="text-xs text-slate-300">
-                                    <span className="text-slate-400">{reply.user?.name || 'Doc gia'}: </span>
-                                    {reply.content}
-                                  </div>
-                                ))}
+                                {comment.replies.map((reply: any) => {
+                                  const badge = resolveUserTier(reply.user?.role, reply.user?.totalDeposited);
+                                  return (
+                                    <div key={reply.id} className="text-xs text-slate-300">
+                                      <span className="text-slate-400">{reply.user?.name || 'Doc gia'}: </span>
+                                      {badge && (
+                                        <span className={`text-[9px] px-1 py-0.5 rounded uppercase mr-1 ${badge.className}`}>
+                                          {badge.label}
+                                        </span>
+                                      )}
+                                      {reply.content}
+                                    </div>
+                                  );
+                                })}
                               </div>
-                    )}
-                  </div>
-                ))
+                            )}
+                          </div>
+                        ))
               )}
             </div>
           </div>

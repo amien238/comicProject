@@ -14,10 +14,11 @@ const commentUserSelect = {
 
 const getCommentTree = async (where) => {
   return prisma.comment.findMany({
-    where: { ...where, parentId: null },
+    where: { ...where, parentId: null, status: 'VISIBLE' },
     include: {
       user: { select: commentUserSelect },
       replies: {
+        where: { status: 'VISIBLE' },
         include: { user: { select: commentUserSelect } },
         orderBy: { createdAt: 'asc' },
       },
@@ -175,6 +176,19 @@ const addComment = async (req, res) => {
   }
 
   try {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, isSuspended: true },
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (currentUser.isSuspended) {
+      return res.status(403).json({ error: 'Your account is suspended from commenting.' });
+    }
+
     let targetComicId = normalizedComicId || null;
     let targetChapterId = normalizedChapterId || null;
     let parentComment = null;
@@ -182,11 +196,15 @@ const addComment = async (req, res) => {
     if (normalizedParentId) {
       parentComment = await prisma.comment.findUnique({
         where: { id: normalizedParentId },
-        select: { id: true, userId: true, comicId: true, chapterId: true },
+        select: { id: true, userId: true, comicId: true, chapterId: true, status: true },
       });
 
       if (!parentComment) {
         return res.status(404).json({ error: 'Parent comment not found.' });
+      }
+
+      if (parentComment.status !== 'VISIBLE') {
+        return res.status(400).json({ error: 'Cannot reply to a hidden/deleted comment.' });
       }
 
       targetComicId = parentComment.comicId;
@@ -202,22 +220,30 @@ const addComment = async (req, res) => {
     } else if (targetChapterId) {
       const chapter = await prisma.chapter.findUnique({
         where: { id: targetChapterId },
-        select: { id: true, comicId: true },
+        select: { id: true, comicId: true, status: true, comic: { select: { status: true } } },
       });
 
       if (!chapter) {
         return res.status(404).json({ error: 'Chapter not found.' });
       }
 
+      if (chapter.status !== 'PUBLISHED' || chapter.comic?.status !== 'PUBLISHED') {
+        return res.status(400).json({ error: 'Cannot comment on hidden chapter/comic.' });
+      }
+
       targetComicId = chapter.comicId;
     } else if (targetComicId) {
       const comic = await prisma.comic.findUnique({
         where: { id: targetComicId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
 
       if (!comic) {
         return res.status(404).json({ error: 'Comic not found.' });
+      }
+
+      if (comic.status !== 'PUBLISHED') {
+        return res.status(400).json({ error: 'Cannot comment on hidden comic.' });
       }
     } else {
       return res.status(400).json({ error: 'comicId or chapterId is required.' });
@@ -254,6 +280,7 @@ const addComment = async (req, res) => {
       await prisma.notification.createMany({
         data: Array.from(recipients).map((recipientId) => ({
           userId: recipientId,
+          type: isReply ? 'COMMENT_REPLY' : 'COMMENT',
           title: isReply ? 'New reply to your comment' : 'New comment activity',
           message: isReply
             ? `Someone replied on ${comic.title}.`
@@ -270,6 +297,65 @@ const addComment = async (req, res) => {
   }
 };
 
+const reportComment = async (req, res) => {
+  try {
+    const reporterId = req.user?.userId;
+    if (!reporterId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const commentId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+    if (!commentId) return res.status(400).json({ error: 'Comment id is required.' });
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const comment = await tx.comment.findUnique({
+        where: { id: commentId },
+        select: { id: true, userId: true, content: true, chapterId: true, comicId: true, reportedCount: true },
+      });
+
+      if (!comment) throw new Error('COMMENT_NOT_FOUND');
+
+      const next = await tx.comment.update({
+        where: { id: commentId },
+        data: { reportedCount: { increment: 1 } },
+        select: { id: true, reportedCount: true, chapterId: true, comicId: true },
+      });
+
+      const admins = await tx.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true },
+      });
+
+      if (admins.length > 0) {
+        await tx.notification.createMany({
+          data: admins.map((admin) => ({
+            userId: admin.id,
+            type: 'REPORT',
+            title: 'Comment reported',
+            message: `A comment has been reported by user ${reporterId}.`,
+            link: '/admin',
+            metadata: {
+              commentId: comment.id,
+              reporterId,
+              ownerId: comment.userId,
+              reportedCount: next.reportedCount,
+            },
+          })),
+        });
+      }
+
+      return next;
+    });
+
+    return res.json({ message: 'Comment reported.', report: updated });
+  } catch (error) {
+    if (error.message === 'COMMENT_NOT_FOUND') {
+      return res.status(404).json({ error: 'Comment not found.' });
+    }
+
+    console.error('reportComment error:', error);
+    return res.status(500).json({ error: 'Server error while reporting comment.' });
+  }
+};
+
 module.exports = {
   incrementView,
   rateComic,
@@ -278,4 +364,5 @@ module.exports = {
   getComicComments,
   getChapterComments,
   addComment,
+  reportComment,
 };
