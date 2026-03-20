@@ -265,8 +265,8 @@ export default function ComicDetail() {
         <div className="absolute top-[10%] right-[-5%] w-[500px] h-[500px] bg-pink-300/20 blur-[120px] rounded-full pointer-events-none mix-blend-multiply" />
         <div className="absolute bottom-[20%] left-[20%] w-[700px] h-[500px] bg-indigo-300/20 blur-[120px] rounded-full pointer-events-none mix-blend-multiply" />
 
+        <div className='gap-7 h-15' />
 
-        <div className='gap-7 h-15'/>
         <main className="max-w-6xl mx-auto p-4 sm:p-6 mt-6 relative z-10 animate-fade-in">
           {/* Hero Section - Glassmorphism Card */}
           <div className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-8 flex flex-col md:flex-row gap-8 lg:gap-12 shadow-[0_8px_32px_rgba(0,0,0,0.04)] border border-white/60 relative">
