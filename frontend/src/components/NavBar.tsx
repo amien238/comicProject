@@ -134,7 +134,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                   onClick={() => router.push('/author')}
                   className="hidden sm:block bg-purple-500/10 backdrop-blur-xl border border-purple-500/20 text-purple-700 px-4 py-2 rounded-full font-bold text-xs shadow-[0_4px_15px_rgba(168,85,247,0.05)] hover:bg-purple-500/20 hover:shadow-[0_4px_20px_rgba(168,85,247,0.15)] hover:-translate-y-0.5 transition-all duration-300"
                 >
-                  Khu vực Tác giả
+                  Truyện
                 </button>
               )}
 
@@ -143,7 +143,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                   onClick={() => router.push('/accounting')}
                   className="hidden sm:block bg-sky-500/10 backdrop-blur-xl border border-sky-500/20 text-sky-700 px-4 py-2 rounded-full font-bold text-xs shadow-[0_4px_15px_rgba(14,165,233,0.05)] hover:bg-sky-500/20 hover:shadow-[0_4px_20px_rgba(14,165,233,0.15)] hover:-translate-y-0.5 transition-all duration-300"
                 >
-                  Accounting
+                  Doanh Thu
                 </button>
               )}
 
@@ -152,7 +152,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                   onClick={() => router.push('/admin')}
                   className="hidden sm:block bg-rose-500/10 backdrop-blur-xl border border-rose-500/20 text-rose-700 px-4 py-2 rounded-full font-bold text-xs shadow-[0_4px_15px_rgba(244,63,113,0.05)] hover:bg-rose-500/20 hover:shadow-[0_4px_20px_rgba(244,63,113,0.15)] hover:-translate-y-0.5 transition-all duration-300"
                 >
-                  Dashboard Admin
+                  Dashboard
                 </button>
               )}
 
@@ -188,14 +188,14 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                           <button
                             key={item.id}
                             onClick={() => handleNotificationClick(item)}
-                            className={`w-full text-left px-4 py-3 border-b border-white/40 hover:bg-white/60 transition-colors ${
+                            className={`w-full border text-left px-4 py-3 border-white/40 hover:bg-white/90 hover:border-white transition-colors rounded-3xl ${
                               item.isRead ? 'opacity-60 bg-transparent' : 'bg-white/40'
                             }`}
                           >
-                            <div className={`text-sm mb-1 ${item.isRead ? 'font-medium text-slate-600' : 'font-bold text-slate-800'}`}>
+                            <div className={`text-sm mb-1 ${item.isRead ? 'font-medium text-slate-900' : 'font-bold text-slate-800'}`}>
                               {item.title}
                             </div>
-                            <div className="text-xs text-slate-500 line-clamp-2">{item.message}</div>
+                            <div className="text-xs text-slate-900 line-clamp-2">{item.message}</div>
                             <div className="text-[10px] text-slate-400 mt-1.5 font-medium">
                               {new Date(item.createdAt).toLocaleString('vi-VN')}
                             </div>
