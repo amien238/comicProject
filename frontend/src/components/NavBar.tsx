@@ -172,7 +172,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                 </button>
 
                 {openNotifications && (
-                  <div className="absolute right-0 mt-3 w-80 bg-white/70 backdrop-blur-3xl border border-white/80 rounded-3xl shadow-[0_20px_60px_rgb(0,0,0,0.08)] overflow-hidden z-[60]">
+                  <div className="absolute right-0 mt-3 w-80 bg-white/70 backdrop-blur-3xl border border-white/80 rounded-3xl shadow-[0_20px_60px_rgb(0,0,0,0.08)] overflow-hidden z-[60] px-2 py-2 ">
                     <div className="px-4 py-3 border-b border-white/40 flex items-center justify-between bg-slate-50/30">
                       <span className="font-bold text-sm text-slate-800">Thông báo</span>
                       <span className="text-xs font-semibold bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full border border-blue-500/20">{notifications.length}</span>
