@@ -179,7 +179,7 @@ export default function Home() {
           </div>
 
           {/* Nửa Phải: Danh sách Top 3 truyện (Poster bự & Chữ số Glassmorphism nổi lên trên) */}
-          <div className="z-10 relative md:w-7/12 w-full flex flex-row gap-8 sm:gap-14 justify-center md:justify-end items-end h-full mt-6 md:mt-0">
+          <div className="z-10 relative md:w-7/12 w-full flex flex-row gap-3 sm:gap-4 justify-center md:justify-end items-end h-full mt-6 md:mt-0">
             {topComics.length > 0 && Array.from({ length: Math.min(3, topComics.length) }).map((_, offset) => {
               const index = (currentTopIndex + offset) % topComics.length;
               const comic = topComics[index];
