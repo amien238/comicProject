@@ -1,4 +1,4 @@
-"use client";
+'use client';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, BookOpen, Coins, LogOut, Search, User } from 'lucide-react';
@@ -20,6 +20,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [openNotifications, setOpenNotifications] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -39,6 +40,15 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
       .catch(() => setNotifications([]))
       .finally(() => setLoadingNotifications(false));
   }, [user]);
+
+  //scroll page navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const onClickOutside = (event: MouseEvent) => {
@@ -86,45 +96,52 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
   };
 
   return (
-    <nav className="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-md">
-      <div className="max-w-6xl mx-auto flex justify-between items-center">
-        <div className="flex items-center space-x-2 cursor-pointer" onClick={onGoHome}>
-          <div className="bg-blue-600 p-2 rounded-lg">
-            <BookOpen size={24} />
+    <div className={`fixed w-full z-50 top-0 transition-all duration-300 ${scrolled ? 'p-2' : 'p-4'}`}>
+      {/* Tăng độ mờ (blur) và làm mỏng nền trắng (white/50) cho Navbar tổng */}
+      <nav className="max-w-7xl mx-auto bg-white/50 backdrop-blur-2xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] px-6 py-3 flex justify-between items-center rounded-full">
+        
+        {/* Logo */}
+        <div className="flex items-center space-x-2 cursor-pointer group" onClick={onGoHome}>
+          <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-teal-400 rounded-xl flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform duration-300">
+            <BookOpen size={20} strokeWidth={2.5} />
           </div>
-          <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+          <span className="text-xl font-bold tracking-tight text-slate-800">
             AmienComic
           </span>
         </div>
 
-        <div className="hidden md:flex items-center bg-slate-800 rounded-full px-4 py-2 w-1/3 border border-slate-700 focus-within:border-blue-500 transition-colors">
-          <Search size={18} className="text-slate-400 mr-2" />
+        {/* Search Bar - Kính mờ chìm */}
+        <div className="hidden md:flex items-center bg-slate-900/5 backdrop-blur-xl rounded-full px-4 py-2 w-1/3 border border-white/60 focus-within:bg-white/60 focus-within:border-blue-400/50 focus-within:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300">
+          <Search size={18} className="text-slate-500 mr-2" />
           <input
             type="text"
-            placeholder="Tim kiem truyen... (Nhan Enter)"
-            className="bg-transparent border-none outline-none w-full text-sm text-white"
+            placeholder="Tìm kiếm truyện... (Nhấn Enter)"
+            className="bg-transparent border-none outline-none w-full text-sm text-slate-800 placeholder-slate-500 font-medium"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleSearch}
           />
         </div>
 
+        {/* Right Section */}
         <div>
           {user ? (
             <div className="flex items-center space-x-3 sm:space-x-4">
+              
+              {/* Nút Role: Kính mờ pha màu (Tinted Frosted Glass) thay vì Gradient đặc */}
               {(user.role === 'AUTHOR' || user.role === 'ADMIN') && (
                 <button
                   onClick={() => router.push('/author')}
-                  className="hidden sm:block bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white px-4 py-1.5 rounded-full font-bold text-sm shadow-lg transition-all"
+                  className="hidden sm:block bg-purple-500/10 backdrop-blur-xl border border-purple-500/20 text-purple-700 px-4 py-2 rounded-full font-bold text-xs shadow-[0_4px_15px_rgba(168,85,247,0.05)] hover:bg-purple-500/20 hover:shadow-[0_4px_20px_rgba(168,85,247,0.15)] hover:-translate-y-0.5 transition-all duration-300"
                 >
-                  Khu vuc Tac gia
+                  Khu vực Tác giả
                 </button>
               )}
 
               {(user.role === 'ACCOUNTER' || user.role === 'ADMIN') && (
                 <button
                   onClick={() => router.push('/accounting')}
-                  className="hidden sm:block bg-gradient-to-r from-cyan-600 to-sky-500 hover:from-cyan-500 hover:to-sky-400 text-white px-4 py-1.5 rounded-full font-bold text-sm shadow-lg transition-all"
+                  className="hidden sm:block bg-sky-500/10 backdrop-blur-xl border border-sky-500/20 text-sky-700 px-4 py-2 rounded-full font-bold text-xs shadow-[0_4px_15px_rgba(14,165,233,0.05)] hover:bg-sky-500/20 hover:shadow-[0_4px_20px_rgba(14,165,233,0.15)] hover:-translate-y-0.5 transition-all duration-300"
                 >
                   Accounting
                 </button>
@@ -133,50 +150,53 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
               {user.role === 'ADMIN' && (
                 <button
                   onClick={() => router.push('/admin')}
-                  className="hidden sm:block bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white px-4 py-1.5 rounded-full font-bold text-sm shadow-lg transition-all"
+                  className="hidden sm:block bg-rose-500/10 backdrop-blur-xl border border-rose-500/20 text-rose-700 px-4 py-2 rounded-full font-bold text-xs shadow-[0_4px_15px_rgba(244,63,113,0.05)] hover:bg-rose-500/20 hover:shadow-[0_4px_20px_rgba(244,63,113,0.15)] hover:-translate-y-0.5 transition-all duration-300"
                 >
                   Dashboard Admin
                 </button>
               )}
 
+              {/* Notifications - Kính mờ nhô lên */}
               <div className="relative" ref={panelRef}>
                 <button
                   onClick={handleOpenNotification}
-                  className="relative bg-slate-800 p-2 rounded-full border border-slate-700 hover:border-blue-500 transition-colors"
-                  title="Thong bao"
+                  className="relative bg-slate-900/5 backdrop-blur-xl p-2.5 rounded-full border border-white/60 hover:bg-white/60 hover:text-blue-600 text-slate-600 shadow-[0_4px_15px_rgba(0,0,0,0.02)] transition-all"
+                  title="Thông báo"
                 >
-                  <Bell size={18} className="text-slate-200" />
+                  <Bell size={18} />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 text-[10px] bg-red-500 text-white rounded-full min-w-4 h-4 px-1 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center shadow-sm border border-white/50">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </button>
 
                 {openNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-[60]">
-                    <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                      <span className="font-bold text-sm">Thong bao</span>
-                      <span className="text-xs text-slate-400">{notifications.length}</span>
+                  <div className="absolute right-0 mt-3 w-80 bg-white/70 backdrop-blur-3xl border border-white/80 rounded-3xl shadow-[0_20px_60px_rgb(0,0,0,0.08)] overflow-hidden z-[60]">
+                    <div className="px-4 py-3 border-b border-white/40 flex items-center justify-between bg-slate-50/30">
+                      <span className="font-bold text-sm text-slate-800">Thông báo</span>
+                      <span className="text-xs font-semibold bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full border border-blue-500/20">{notifications.length}</span>
                     </div>
 
                     <div className="max-h-80 overflow-y-auto">
                       {loadingNotifications ? (
-                        <div className="p-4 text-sm text-slate-400">Dang tai...</div>
+                        <div className="p-4 text-sm text-slate-500 text-center">Đang tải...</div>
                       ) : notifications.length === 0 ? (
-                        <div className="p-4 text-sm text-slate-500">Chua co thong bao nao.</div>
+                        <div className="p-4 text-sm text-slate-500 text-center">Chưa có thông báo nào.</div>
                       ) : (
                         notifications.map((item) => (
                           <button
                             key={item.id}
                             onClick={() => handleNotificationClick(item)}
-                            className={`w-full text-left px-4 py-3 border-b border-slate-800 hover:bg-slate-800 transition-colors ${
-                              item.isRead ? 'text-slate-400' : 'text-slate-100'
+                            className={`w-full text-left px-4 py-3 border-b border-white/40 hover:bg-white/60 transition-colors ${
+                              item.isRead ? 'opacity-60 bg-transparent' : 'bg-white/40'
                             }`}
                           >
-                            <div className="text-sm font-semibold mb-1">{item.title}</div>
-                            <div className="text-xs line-clamp-2">{item.message}</div>
-                            <div className="text-[10px] text-slate-500 mt-1">
+                            <div className={`text-sm mb-1 ${item.isRead ? 'font-medium text-slate-600' : 'font-bold text-slate-800'}`}>
+                              {item.title}
+                            </div>
+                            <div className="text-xs text-slate-500 line-clamp-2">{item.message}</div>
+                            <div className="text-[10px] text-slate-400 mt-1.5 font-medium">
                               {new Date(item.createdAt).toLocaleString('vi-VN')}
                             </div>
                           </button>
@@ -187,46 +207,49 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                 )}
               </div>
 
-              <div className="flex items-center bg-slate-800 px-3 py-1.5 rounded-full border border-yellow-500/30">
-                <Coins size={16} className="text-yellow-400 mr-1.5" />
-                <span className="font-semibold text-yellow-400">{user.points || 0}</span>
+              {/* Coins/Points - Kính mờ vàng */}
+              <div className="flex items-center bg-amber-500/10 backdrop-blur-xl px-3 py-1.5 rounded-full border border-amber-500/20 shadow-[0_4px_15px_rgba(245,158,11,0.05)]">
+                <Coins size={16} className="text-amber-500 mr-1.5 drop-shadow-sm" />
+                <span className="font-bold text-sm text-amber-600">{user.points || 0}</span>
               </div>
 
+              {/* User Profile - Kính mờ bọc Avatar */}
               <div
-                className="flex items-center space-x-2 cursor-pointer hover:bg-slate-800 p-2 rounded-lg transition-colors"
+                className="flex items-center space-x-2 cursor-pointer bg-slate-900/5 hover:bg-white/60 backdrop-blur-xl p-1 pr-3 rounded-full border border-white/60 transition-all shadow-[0_4px_15px_rgba(0,0,0,0.02)]"
                 onClick={() => router.push('/profile')}
               >
-                <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-full flex items-center justify-center font-bold">
+                <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-teal-400 rounded-full flex items-center justify-center font-bold text-white shadow-inner">
                   {user.name?.charAt(0).toUpperCase()}
                 </div>
-                <div className="hidden sm:flex flex-col leading-tight">
-                  <span className="font-medium">{user.name}</span>
-                  {tier && <span className={`text-[10px] px-1.5 py-0.5 rounded ${tier.className}`}>{tier.label}</span>}
+                <div className="hidden sm:flex flex-col leading-tight justify-center">
+                  <span className="font-bold text-sm text-slate-700">{user.name}</span>
+                  {tier && <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded shadow-sm w-fit ${tier.className}`}>{tier.label}</span>}
                 </div>
               </div>
 
+              {/* Logout Button */}
               <button
                 onClick={() => {
                   logout();
                   router.push('/');
                 }}
-                className="text-slate-400 hover:text-red-400 p-2"
-                title="Dang xuat"
+                className="bg-slate-900/5 backdrop-blur-xl border border-white/60 text-slate-500 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/20 p-2 rounded-full transition-all shadow-[0_4px_15px_rgba(0,0,0,0.02)]"
+                title="Đăng xuất"
               >
-                <LogOut size={20} />
+                <LogOut size={18} />
               </button>
             </div>
           ) : (
             <button
               onClick={onOpenAuthModal}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-full font-medium transition-colors"
+              className="flex items-center gap-2 bg-white/70 backdrop-blur-xl border border-white/80 text-blue-600 px-5 py-2.5 rounded-full font-bold transition-all shadow-[0_8px_20px_rgba(0,0,0,0.05)] hover:bg-white hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] hover:-translate-y-0.5"
             >
               <User size={18} />
-              <span>Dang nhap</span>
+              <span className="text-sm">Đăng nhập</span>
             </button>
           )}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </div>
   );
 }

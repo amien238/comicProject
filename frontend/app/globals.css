@@ -1,16 +1,11 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
+/* @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
+} */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -19,8 +14,43 @@
   }
 }
 
+:root {
+  --background: #f4f7fb; /* Nền màu sáng, hơi ngả xanh xám nhẹ */
+  --foreground: #1e293b; /* Chữ màu xám đậm dễ đọc */
+}
+
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+  background-attachment: fixed;
   color: var(--foreground);
+  min-height: 100vh;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  /* Class tạo hiệu ứng kính mờ chuẩn iOS */
+  .glass-panel {
+    @apply bg-white/60 backdrop-blur-xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-3xl;
+  }
+  
+  /* Nút bấm nổi bật (Giống ảnh) */
+  .btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white font-medium py-2.5 px-6 rounded-full transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5;
+  }
+
+  .btn-secondary {
+    @apply bg-white/80 hover:bg-white text-slate-700 font-medium py-2.5 px-6 rounded-full transition-all duration-300 shadow-sm border border-slate-200;
+  }
+}
+
+/* Tùy chỉnh thanh cuộn cho thanh lịch */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 10px;
 }
