@@ -64,16 +64,16 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         {/* Nút Close tròn trĩnh nổi bật trên nền kính */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-white/50 border border-white/60 hover:bg-white text-slate-500 hover:text-slate-800 font-bold transition-all shadow-sm"
+          className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-white/50 border border-white/60 hover:bg-white text-slate-500 hover:text-red-500 font-bold transition-all shadow-sm"
         >
           ✕
         </button>
 
         <div className="mb-6">
-          <h2 className="text-2xl font-extrabold text-center text-slate-800 tracking-tight">
+          <h2 className="text-2xl font-medium text-center text-slate-800 tracking-tight">
             {mode === 'login' ? 'Đăng nhập AmienComic' : 'Tạo tài khoản mới'}
           </h2>
-          <p className="text-center text-sm text-slate-500 mt-1.5 font-medium">
+          <p className="text-center text-sm text-slate-500 mt-1.5">
             Mở khóa đầy đủ tính năng ngay hôm nay.
           </p>
         </div>
@@ -96,7 +96,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   resetError();
                 }}
                 required={mode === 'register'}
-                className="w-full p-3.5 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl focus:border-blue-400 focus:bg-white/80 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-slate-800 placeholder-slate-400 font-medium shadow-sm"
+                className="w-full p-3.5 bg-white/40 backdrop-blur-md border border-white/60 rounded-full focus:border-blue-400 focus:bg-white/80 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-slate-800 placeholder-slate-400 shadow-sm"
                 placeholder="Nguyễn Văn A"
               />
             </div>
@@ -112,7 +112,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                 resetError();
               }}
               required
-              className="w-full p-3.5 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl focus:border-blue-400 focus:bg-white/80 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-slate-800 placeholder-slate-400 font-medium shadow-sm"
+              className="w-full p-3.5 bg-white/40 backdrop-blur-md border border-white/60 rounded-full focus:border-blue-400 focus:bg-white/80 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-slate-800 placeholder-slate-400 shadow-sm"
               placeholder="user@example.com"
             />
           </div>
@@ -127,7 +127,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                 resetError();
               }}
               required
-              className="w-full p-3.5 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl focus:border-blue-400 focus:bg-white/80 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-slate-800 placeholder-slate-400 font-medium shadow-sm"
+              className="w-full p-3.5 bg-white/40 backdrop-blur-md border border-white/60 rounded-full focus:border-blue-400 focus:bg-white/80 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-slate-800 placeholder-slate-400 font-medium shadow-sm"
               placeholder="••••••••"
             />
           </div>
@@ -135,7 +135,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           <button
             type="submit"
             disabled={loading}
-            className={`font-bold p-3.5 rounded-2xl transition-all mt-4 text-white shadow-lg flex items-center justify-center ${
+            className={`font-bold p-3.5 rounded-full transition-all mt-4 text-white shadow-lg flex items-center justify-center ${
               loading 
                 ? 'bg-blue-400 cursor-not-allowed shadow-none' 
                 : 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/30 hover:shadow-blue-500/40 hover:-translate-y-0.5'
@@ -153,7 +153,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         {/* Divider */}
         <div className="relative flex items-center py-6">
           <div className="flex-grow border-t border-slate-300/50"></div>
-          <span className="flex-shrink-0 mx-4 text-slate-400/80 text-xs font-semibold uppercase tracking-wider">Hoặc tiếp tục với</span>
+          <span className="flex-shrink-0 mx-4 text-slate-400/80 text-xs font-medium tracking-wider">Hoặc tiếp tục với</span>
           <div className="flex-grow border-t border-slate-300/50"></div>
         </div>
 
@@ -161,7 +161,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           <button
             disabled={loading}
             onClick={() => handleSocialAuth('google')}
-            className="w-full bg-white/60 backdrop-blur-md border border-white/80 text-slate-700 p-3 rounded-2xl font-bold hover:bg-white transition-colors shadow-sm flex items-center justify-center gap-2"
+            className="w-full bg-white/60 backdrop-blur-md border border-white/80 text-slate-700 p-3 rounded-full font-bold hover:bg-white transition-colors shadow-sm flex items-center justify-center gap-2"
           >
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
             Google
@@ -170,7 +170,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             <button
               disabled={loading}
               onClick={() => handleSocialAuth('facebook')}
-              className="w-full bg-[#1877F2]/90 backdrop-blur-md text-white border border-[#1877F2]/50 p-3 rounded-2xl font-bold hover:bg-[#1864D9] transition-colors shadow-sm flex items-center justify-center gap-2"
+              className="w-full bg-[#1877F2]/90 backdrop-blur-md text-white border border-[#1877F2]/50 p-3 rounded-full font-bold hover:bg-[#1864D9] transition-colors shadow-sm flex items-center justify-center gap-2"
             >
               <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" alt="Facebook" className="w-5 h-5 brightness-0 invert" />
               Facebook
@@ -178,7 +178,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             <button
               disabled={loading}
               onClick={() => handleSocialAuth('apple')}
-              className="w-full bg-black/90 backdrop-blur-md text-white border border-slate-800 p-3 rounded-2xl font-bold hover:bg-black transition-colors shadow-sm flex items-center justify-center gap-2"
+              className="w-full bg-black/90 backdrop-blur-md text-white border border-slate-800 p-3 rounded-full font-bold hover:bg-black transition-colors shadow-sm flex items-center justify-center gap-2"
             >
               <img src="https://www.svgrepo.com/show/511330/apple-173.svg" alt="Apple" className="w-5 h-5 brightness-0 invert" />
               Apple
@@ -186,11 +186,11 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           </div>
         </div>
 
-        <p className="text-center text-slate-500 text-sm mt-8 font-medium">
+        <p className="text-center text-slate-500 text-sm mt-8">
           {mode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}{' '}
           <button
             type="button"
-            className="text-blue-500 font-bold hover:text-blue-600 transition-colors"
+            className="text-blue-500 font-medium hover:text-blue-600 transition-colors"
             onClick={() => {
               setMode(mode === 'login' ? 'register' : 'login');
               setError('');

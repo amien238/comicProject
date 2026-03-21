@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Star, Eye, Zap, TrendingUp, Crown, Bot, X, Send, MessageCircle, Clock, Play, Heart, Flame } from 'lucide-react';
 import Navbar from '../src/components/NavBar';
 import AuthModal from '../src/components/AuthModal';
-import { comicApi, tagApi, aiApi, historyApi } from '../src/services/api';
+import { comicApi, tagApi, aiApi, historyApi, userApi } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 
 // Hàm tính thời gian cập nhật
@@ -29,6 +29,7 @@ export default function Home() {
   const [tags, setTags] = useState<any[]>([]);
   const [recentHistory, setRecentHistory] = useState<any[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -56,9 +57,13 @@ export default function Home() {
         if (user) {
           try {
             const history = await historyApi.getMyHistory();
+            const favoritesData = await userApi.getFavorites().catch(() => []);
+
             setRecentHistory(Array.isArray(history) ? history.slice(0, 4) : []);
+            setFavorites(Array.isArray(favoritesData) ? favoritesData : []);
           } catch (err) {
             setRecentHistory([]);
+            setFavorites([]);
           }
         }
       } catch (error) {
@@ -128,8 +133,8 @@ export default function Home() {
         {/* KHU VỰC: TIẾP TỤC ĐỌC (Lịch sử) */}
         {!selectedTag && recentHistory.length > 0 && (
           <div className="mb-12 animate-fade-in">
-            <h2 className="text-xl font-extrabold mb-5 flex items-center text-slate-800 tracking-tight">
-              <Clock size={22} className="mr-2 text-blue-500" /> Tiếp tục đọc
+            <h2 className="text-xl font-medium mb-5 flex items-center text-blue-500 tracking-tight">
+              <Clock size={25} className="mr-2 text-blue-500" /> Tiếp tục đọc
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {recentHistory.map((item, idx) => (
@@ -171,9 +176,9 @@ export default function Home() {
             <p className="text-slate-600 mb-8 max-w-md font-medium text-lg leading-relaxed">
               Khám phá hàng ngàn chương truyện bản quyền. Hỗ trợ tác giả yêu thích của bạn trực tiếp qua hệ thống điểm thưởng.
             </p>
-            <button className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-500 hover:to-teal-400 text-white px-8 py-3.5 rounded-full font-bold flex items-center shadow-[0_10px_20px_rgba(59,130,246,0.3)] hover:shadow-[0_15px_30px_rgba(59,130,246,0.4)] hover:-translate-y-1 transition-all duration-300">
+            <button className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-500 hover:to-teal-400 text-white px-8 py-3.5 rounded-full shadow-[0_10px_20px_rgba(59,130,246,0.3)] hover:shadow-[0_15px_30px_rgba(59,130,246,0.4)] hover:-translate-y-1 transition-all duration-300">
               <a href="#list-truyen">
-                <Zap size={20} className="mr-2 fill-yellow-300 text-yellow-300 drop-shadow-sm" /> KHÁM PHÁ NGAY
+                Khám phá ngay
               </a>
             </button>
           </div>
@@ -272,6 +277,7 @@ export default function Home() {
 
                   {/* Thay thế chữ Hot bằng Icon trái tim (nếu đã yêu thích) nằm ở góc trái */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1.5 z-10">
+                    
                     {(comic.isFavorited || (user && comic.favorites?.some((f: any) => f.userId === user.id))) && (
                       <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-sm w-fit flex items-center justify-center">
                         <Heart size={14} className="fill-pink-500 text-pink-500" />
@@ -305,7 +311,7 @@ export default function Home() {
                       Chap {comic.latestChapter?.chapterNumber ?? comic.chapters?.length ?? '0'}
                     </span>
                     <span className="flex items-center gap-1.5 text-blue-500">
-                      <Eye size={13} className="text-blue-500" /> 
+                      <Eye size={13} className="text-blue-500" />
                       {comic.views || 0}
                     </span>
                   </div>
