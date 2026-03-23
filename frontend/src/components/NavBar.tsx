@@ -99,7 +99,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
     <div className={`fixed w-full z-50 top-0 transition-all duration-300 ${scrolled ? 'p-2' : 'p-4'}`}>
       {/* Tăng độ mờ (blur) và làm mỏng nền trắng (white/50) cho Navbar tổng */}
       <nav className="max-w-7xl mx-auto bg-white/50 backdrop-blur-2xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] px-6 py-3 flex justify-between items-center rounded-full">
-        
+
         {/* Logo */}
         <div className="flex items-center space-x-2 cursor-pointer group" onClick={onGoHome}>
           <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-teal-400 rounded-xl flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform duration-300">
@@ -127,7 +127,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
         <div>
           {user ? (
             <div className="flex items-center space-x-3 sm:space-x-4">
-              
+
               {/* Nút Role: Kính mờ pha màu (Tinted Frosted Glass) thay vì Gradient đặc */}
               {(user.role === 'AUTHOR' || user.role === 'ADMIN') && (
                 <button
@@ -188,9 +188,8 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                           <button
                             key={item.id}
                             onClick={() => handleNotificationClick(item)}
-                            className={`w-full border text-left px-4 py-3 border-white/40 hover:bg-white/90 hover:border-white transition-colors rounded-3xl ${
-                              item.isRead ? 'opacity-60 bg-transparent' : 'bg-white/40'
-                            }`}
+                            className={`w-full border text-left px-4 py-3 border-white/40 hover:bg-white/90 hover:border-white transition-colors rounded-3xl ${item.isRead ? 'opacity-60 bg-transparent' : 'bg-white/40'
+                              }`}
                           >
                             <div className={`text-sm mb-1 ${item.isRead ? 'font-medium text-slate-900' : 'font-bold text-slate-800'}`}>
                               {item.title}
@@ -219,7 +218,10 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                 onClick={() => router.push('/profile')}
               >
                 <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-teal-400 rounded-full flex items-center justify-center font-bold text-white shadow-inner">
-                  {user.name?.charAt(0).toUpperCase()}
+                  {user.avatar ?
+                    (
+                      <img src={user.avatar} className="w-full h-full object-cover rounded-full" alt="avatar" />
+                    ) : (user.name?.charAt(0).toUpperCase())}
                 </div>
                 <div className="hidden sm:flex flex-col leading-tight justify-center">
                   <span className="font-bold text-sm text-slate-700">{user.name}</span>

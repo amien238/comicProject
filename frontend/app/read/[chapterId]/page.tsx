@@ -389,8 +389,8 @@ export default function ReadChapter() {
             onClick={() => nextChapter && handleNavigate(nextChapter.id)}
             disabled={!nextChapter}
             className={`flex items-center justify-center p-4 rounded-3xl font-bold transition-all ${nextChapter
-                ? 'bg-gradient-to-tr from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/30'
-                : `text-slate-300 dark:text-slate-600 cursor-not-allowed ${themeConfig.btnHover}`
+              ? 'bg-gradient-to-tr from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+              : `text-slate-300 dark:text-slate-600 cursor-not-allowed ${themeConfig.btnHover}`
               }`}
           >
             <ChevronRight size={24} />
@@ -450,16 +450,19 @@ export default function ReadChapter() {
                 <div className={`rounded-[1.5rem] p-5 border transition-all ${themeConfig.bubble}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-xs text-white font-black shadow-sm">
-                        {(comment.user?.name || 'U').charAt(0).toUpperCase()}
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 flex items-center justify-center text-xs text-white font-black shadow-sm">
+                        {comment.user?.avatar ? (
+                          <img src={comment.user?.avatar} className="w-full h-full object-cover rounded-full" alt="avatar" />
+                        ) :
+                          ((comment.user?.name || 'U').charAt(0).toUpperCase())}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-bold text-sm text-blue-600 dark:text-blue-400 leading-none">{comment.user?.name || 'Độc giả'}</span>
+                        <span className="font-medium text-sm text-blue-600 dark:text-blue-400 leading-none">{comment.user?.name || 'Độc giả'}</span>
                         {(() => {
                           const badge = resolveUserTier(comment.user?.role, comment.user?.totalDeposited);
                           if (!badge) return null;
                           return (
-                            <span className={`text-[9px] mt-1 px-1.5 py-0.5 w-fit rounded-md font-black uppercase tracking-wider ${badge.className} shadow-sm`}>
+                            <span className={`text-[9px] mt-1 px-1.5 py-0.5 w-fit rounded-full tracking-wider ${badge.className} shadow-sm`}>
                               {badge.label}
                             </span>
                           );
@@ -474,14 +477,14 @@ export default function ReadChapter() {
                     <button
                       type="button"
                       onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                      className="text-[11px] font-bold text-slate-400 hover:text-blue-500 uppercase tracking-wider transition-colors"
+                      className="text-[12px] text-slate-400 hover:text-blue-500 tracking-wider transition-colors"
                     >
                       Trả lời
                     </button>
                     <button
                       type="button"
                       onClick={() => handleReportComment(comment.id)}
-                      className="text-[11px] font-bold text-slate-400 hover:text-red-500 uppercase tracking-wider transition-colors"
+                      className="text-[12px] text-slate-400 hover:text-red-500 tracking-wider transition-colors"
                     >
                       Báo cáo
                     </button>
@@ -501,9 +504,9 @@ export default function ReadChapter() {
                         type="button"
                         disabled={!replyText.trim() || commentLoading}
                         onClick={(e) => handlePostComment(e, comment.id)}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 transition-all shadow-md shadow-blue-500/20"
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-2.5 w-10 h-9 rounded-full text-xs font-bold disabled:opacity-50 transition-all shadow-md shadow-blue-500/20"
                       >
-                        Gửi
+                        <Send size={20} className="ml-0.5" />
                       </button>
                     </div>
                   )}

@@ -441,6 +441,19 @@ export const userApi = {
 
     return handleResponse(res);
   },
+
+  updateProfile: async (payload: { name?: string; avatar?: string | null }) => {
+    const token = getToken();
+    if (!token) throw new Error('Vui lòng đăng nhập');
+
+    const res = await fetch(`${BASE_URL}/users/me`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    return handleResponse(res);
+  },
 };
 
 export const tagApi = {

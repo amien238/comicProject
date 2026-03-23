@@ -142,10 +142,10 @@ export default function ProfilePage() {
       }
 
       // // Cập nhật thông tin user
-      // await userApi.updateProfile({
-      //   name: editName.trim(),
-      //   avatar: newAvatarUrl
-      // });
+      await userApi.updateProfile({
+        name: editName.trim(),
+        avatar: newAvatarUrl
+      });
 
       // Sử dụng Custom Modal Message thay vì alert mặc định
       const msgBox = document.createElement('div');

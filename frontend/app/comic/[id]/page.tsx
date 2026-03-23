@@ -428,7 +428,10 @@ export default function ComicDetail() {
 
             <form onSubmit={(e) => handlePostComment(e)} className="mb-12 flex gap-4 relative z-10">
               <div className="w-12 h-12 rounded-4xl bg-gradient-to-tr from-blue-400 to-indigo-500 flex items-center justify-center text-white shadow-md shrink-0 border border-white/50">
-                {(user?.name || 'U').charAt(0).toUpperCase()}
+                {user?.avatar ? (
+                  <img src={user?.avatar} className="w-full h-full object-cover rounded-full" alt="avatar" />
+                ) :
+                  ((user?.name || 'U').charAt(0).toUpperCase())}
               </div>
               <div className="flex-1 flex flex-col sm:flex-row gap-3">
                 <div className="flex-1 relative group">
@@ -463,7 +466,10 @@ export default function ComicDetail() {
                     <div key={cmt.id} className="animate-fade-in">
                       <div className="flex gap-4">
                         <div className="w-10 h-10 bg-white border border-slate-200 rounded-4xl flex items-center justify-center font-bold text-slate-500 shrink-0 shadow-sm">
-                          {(cmt.user?.name || 'U').charAt(0).toUpperCase()}
+                          {cmt.user?.avatar ? (
+                            <img src={cmt.user?.avatar} className="w-full h-full object-cover rounded-full" alt="avatar" />
+                          ) :
+                            ((cmt.user?.name || 'U').charAt(0).toUpperCase())}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="bg-white/50 border border-white/80 p-4 rounded-2xl rounded-tl-none shadow-sm backdrop-blur-sm">
@@ -531,9 +537,11 @@ export default function ComicDetail() {
                                   <div key={reply.id} className="flex gap-3 relative">
                                     {/* Connector line for nested UI */}
                                     <div className="absolute -left-[28px] top-4 w-5 h-[3px] bg-slate-200/50 hidden sm:block rounded-r-full"></div>
-
-                                    <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-[11px] font-bold text-slate-400 shrink-0 shadow-sm">
-                                      {(reply.user?.name || 'U').charAt(0).toUpperCase()}
+                                    <div className="w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center text-[11px] font-bold text-slate-400 shrink-0 shadow-sm">
+                                      {reply.user?.avatar ? (
+                                        <img src={reply.user?.avatar} className="w-full h-full object-cover rounded-full" alt="avatar" />
+                                      ) :
+                                        ((reply.user?.name || 'U').charAt(0).toUpperCase())}
                                     </div>
                                     <div className="flex-1 bg-white/40 backdrop-blur-sm p-3.5 rounded-2xl rounded-tl-none border border-white/80 shadow-sm">
                                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">

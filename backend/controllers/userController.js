@@ -133,4 +133,53 @@ const getMyFavorites = async (req, res) => {
   }
 };
 
-module.exports = { getMe, getMyUnlockedChapters, getMyFavorites };
+const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!['USER', 'AUTHOR', 'ACCOUNTER', 'ADMIN'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role.' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { role },
+    });
+
+    res.json({ message: 'Role updated successfully.', user });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error while updating role.' });
+  }
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, avatar } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(avatar !== undefined && { avatar }),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        avatar: true,
+        points: true,
+        totalDeposited: true,
+      }
+    });
+
+    res.json({ message: 'Profile updated successfully', user: updatedUser });
+  } catch (error) {
+    console.error('updateProfile error:', error);
+    res.status(500).json({ error: 'Server error while updating profile.' });
+  }
+};
+
+module.exports = { getMe, getMyUnlockedChapters, getMyFavorites, updateProfile, updateUserRole };
