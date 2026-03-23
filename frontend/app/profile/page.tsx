@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -13,31 +13,36 @@ import {
   Landmark,
   Smartphone,
   Wallet,
+  Camera,
+  User as UserIcon,
+  Settings,
+  CheckCircle2,
+  ImagePlus
 } from 'lucide-react';
 
 import Navbar from '../../src/components/NavBar';
 import { useAuth } from '../../src/context/AuthContext';
-import { historyApi, transactionApi, userApi } from '../../src/services/api';
+import { historyApi, transactionApi, userApi, uploadApi } from '../../src/services/api';
 import { resolveUserTier } from '../../src/utils/userTier';
 
-type ProfileTab = 'unlocked' | 'favorites' | 'history' | 'wallet';
+type ProfileTab = 'account' | 'wallet' | 'unlocked' | 'history' | 'favorites';
 
 const orderStatusLabel = (status: string) => {
   const safeStatus = String(status || '').toUpperCase();
-  if (safeStatus === 'PAID') return { text: 'Da thanh toan', className: 'text-green-400 border-green-500/30 bg-green-500/10' };
-  if (safeStatus === 'PENDING') return { text: 'Cho thanh toan', className: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' };
-  if (safeStatus === 'PROCESSING') return { text: 'Dang xu ly', className: 'text-blue-400 border-blue-500/30 bg-blue-500/10' };
+  if (safeStatus === 'PAID') return { text: 'Đã thanh toán', className: 'text-emerald-600 border-emerald-200 bg-emerald-50' };
+  if (safeStatus === 'PENDING') return { text: 'Chờ thanh toán', className: 'text-amber-600 border-amber-200 bg-amber-50' };
+  if (safeStatus === 'PROCESSING') return { text: 'Đang xử lý', className: 'text-blue-600 border-blue-200 bg-blue-50' };
   if (safeStatus === 'FAILED' || safeStatus === 'CANCELED' || safeStatus === 'EXPIRED') {
-    return { text: safeStatus, className: 'text-red-400 border-red-500/30 bg-red-500/10' };
+    return { text: safeStatus, className: 'text-red-600 border-red-200 bg-red-50' };
   }
-  return { text: safeStatus || 'UNKNOWN', className: 'text-slate-400 border-slate-500/30 bg-slate-500/10' };
+  return { text: safeStatus || 'UNKNOWN', className: 'text-slate-500 border-slate-200 bg-slate-50' };
 };
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, logout, refreshUser } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<ProfileTab>('wallet');
+  const [activeTab, setActiveTab] = useState<ProfileTab>('account');
   const [unlockedChapters, setUnlockedChapters] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<any[]>([]);
   const [readingHistory, setReadingHistory] = useState<any[]>([]);
@@ -47,6 +52,14 @@ export default function ProfilePage() {
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [requestingWithdraw, setRequestingWithdraw] = useState(false);
 
+  // Profile Edit States
+  const [editName, setEditName] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Wallet States
   const [depositAmount, setDepositAmount] = useState(50000);
   const [depositMethod, setDepositMethod] = useState<'BANK_TRANSFER' | 'EWALLET'>('BANK_TRANSFER');
 
@@ -56,6 +69,14 @@ export default function ProfilePage() {
   const [withdrawAccountNumber, setWithdrawAccountNumber] = useState('');
 
   const tier = resolveUserTier(user?.role, user?.totalDeposited);
+
+  // Khởi tạo data ban đầu cho form edit
+  useEffect(() => {
+    if (user) {
+      setEditName(user.name || '');
+      setAvatarPreview(user.avatar || null);
+    }
+  }, [user]);
 
   const loadAllData = async () => {
     if (!user) return;
@@ -84,11 +105,54 @@ export default function ProfilePage() {
     loadAllData();
   }, [user]);
 
+  // --- Handlers ---
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setUpdatingProfile(true);
+    try {
+      let newAvatarUrl = user.avatar;
+
+      if (avatarFile) {
+        // Upload avatar nếu có file mới
+        const uploadRes = await uploadApi.uploadSingle(avatarFile);
+        newAvatarUrl = uploadRes.imageUrl;
+      }
+
+      // // Cập nhật thông tin user
+      // await userApi.updateProfile({
+      //   name: editName.trim(),
+      //   avatar: newAvatarUrl
+      // });
+
+      alert('Cập nhật hồ sơ thành công!');
+      if (refreshUser) await refreshUser();
+      setAvatarFile(null); // reset file state
+    } catch (error: any) {
+      alert(error.message || 'Cập nhật thất bại. Vui lòng thử lại.');
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
   const handleCreatePaymentOrder = async () => {
     if (creatingOrder) return;
-
     if (!Number.isInteger(depositAmount) || depositAmount <= 0) {
-      alert('So tien nap phai la so nguyen duong');
+      alert('Số tiền nạp phải là số nguyên dương lớn hơn 0');
       return;
     }
 
@@ -99,11 +163,11 @@ export default function ProfilePage() {
         method: depositMethod,
       });
 
-      alert(`Tao lenh nap thanh cong: ${result?.order?.providerOrderId || result?.order?.id || ''}`);
+      alert(`Tạo lệnh nạp thành công: ${result?.order?.providerOrderId || result?.order?.id || ''}`);
       const orders = await transactionApi.getMyPaymentOrders(30).catch(() => []);
       setPaymentOrders(Array.isArray(orders) ? orders : []);
     } catch (error: any) {
-      alert(error.message || 'Khong the tao lenh nap');
+      alert(error.message || 'Không thể tạo lệnh nạp');
     } finally {
       setCreatingOrder(false);
     }
@@ -111,14 +175,12 @@ export default function ProfilePage() {
 
   const handleWithdrawRequest = async () => {
     if (requestingWithdraw) return;
-
     if (!Number.isInteger(withdrawAmount) || withdrawAmount <= 0) {
-      alert('So diem rut phai la so nguyen duong');
+      alert('Số điểm rút phải là số nguyên dương lớn hơn 0');
       return;
     }
-
     if (!withdrawAccountNumber.trim()) {
-      alert('Vui long nhap so tai khoan/vi');
+      alert('Vui lòng nhập số tài khoản/ví');
       return;
     }
 
@@ -131,12 +193,12 @@ export default function ProfilePage() {
         accountNumber: withdrawAccountNumber.trim(),
       });
 
-      alert('Gui yeu cau rut tien thanh cong, vui long cho duyet.');
+      alert('Gửi yêu cầu rút tiền thành công, vui lòng chờ duyệt.');
       setWithdrawAccountName('');
       setWithdrawAccountNumber('');
       if (refreshUser) await refreshUser();
     } catch (error: any) {
-      alert(error.message || 'Khong the gui yeu cau rut');
+      alert(error.message || 'Không thể gửi yêu cầu rút');
     } finally {
       setRequestingWithdraw(false);
     }
@@ -149,301 +211,478 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] text-white">
-        <div className="bg-slate-800 p-8 rounded-3xl text-center border border-slate-700 shadow-xl">
-          <h2 className="text-2xl font-bold mb-4">Vui long dang nhap</h2>
-          <button onClick={() => router.push('/')} className="bg-blue-600 px-6 py-2 rounded-xl">
-            Ve Trang Chu
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F7F9] relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-300/20 blur-[100px] rounded-full pointer-events-none" />
+        <div className="bg-white/60 p-8 rounded-[2rem] text-center border border-white/80 shadow-[0_8px_32px_rgba(0,0,0,0.05)] backdrop-blur-2xl relative z-10 max-w-sm w-full mx-4">
+          <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <UserIcon size={40} />
+          </div>
+          <h2 className="text-2xl font-bold mb-3 text-slate-800">Vui lòng đăng nhập</h2>
+          <p className="text-slate-500 mb-8">Bạn cần đăng nhập để truy cập không gian cá nhân của mình.</p>
+          <button onClick={() => router.push('/')} className="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-3.5 rounded-2xl font-bold transition-all shadow-md">
+            Về Trang Chủ
           </button>
         </div>
       </div>
     );
   }
 
+  // Helper cho Input
+  const inputClass = "w-full px-4 py-3 bg-white/60 border border-slate-200/80 rounded-2xl text-slate-700 outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-inner placeholder:text-slate-400";
+
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 pb-10">
-      <Navbar onGoHome={() => router.push('/')} onOpenAuthModal={() => {}} />
+    <div>
+      <div className="relative z-20">
+        <Navbar onGoHome={() => router.push('/')} onOpenAuthModal={() => { }} />
+      </div>
+      <div className="min-h-screen bg-[#F4F7F9] text-slate-800 font-sans pb-20 relative overflow-hidden selection:bg-blue-500/30">
+        <div className='h-15' />
+        {/* iOS Background Blurred Orbs */}
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden mix-blend-multiply opacity-100">
+          <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] bg-cyan-300/30 blur-[120px] rounded-full" />
+          <div className="absolute top-[30%] right-[-10%] w-[500px] h-[500px] bg-pink-300/20 blur-[120px] rounded-full" />
+          <div className="absolute bottom-[10%] left-[20%] w-[700px] h-[500px] bg-indigo-300/20 blur-[120px] rounded-full" />
+        </div>
 
-      <main className="max-w-5xl mx-auto p-4 sm:p-6 mt-4 animate-fade-in">
-        <button onClick={() => router.back()} className="flex items-center text-slate-400 hover:text-white mb-6">
-          <ArrowLeft size={20} className="mr-2" /> Quay lai
-        </button>
 
-        <h1 className="text-3xl font-bold text-white mb-8">Trang Ca Nhan</h1>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="col-span-1 space-y-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-3xl p-6 shadow-xl text-center">
-              <div className="w-24 h-24 mx-auto bg-gradient-to-tr from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-4xl font-bold text-white mb-4">
-                {user.avatar ? (
-                  <img src={user.avatar} className="w-full h-full rounded-full object-cover" alt="avatar" />
-                ) : (
-                  user.name?.charAt(0).toUpperCase()
-                )}
+        <main className="max-w-6xl mx-auto p-4 sm:p-6 mt-4 relative z-10 animate-fade-in">
+          <h1 className="text-2xl font-medium text-slate-800 mb-8 drop-shadow-sm">Trang Cá Nhân</h1>
+
+          <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
+
+            {/* CỘT TRÁI: IDENTITY (Card nhận diện cá nhân) */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white/40 backdrop-blur-2xl border border-white/60 rounded-[2.5rem] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 blur-[40px] rounded-full pointer-events-none" />
+
+                <div className="relative w-28 h-28 mx-auto mb-4 group cursor-pointer" onClick={() => setActiveTab('account')}>
+                  <div className="w-full h-full bg-gradient-to-tr from-blue-400 to-indigo-500 rounded-full shadow-lg shadow-blue-500/20 flex items-center justify-center text-4xl font-black text-white border-4 border-white overflow-hidden transition-transform group-hover:scale-105">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} className="w-full h-full object-cover" alt="avatar" />
+                    ) : (
+                      user.name?.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  {/* Lớp mờ và icon camera khi hover */}
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera className="text-white" size={28} />
+                  </div>
+                </div>
+
+                <h2 className="text-2xl font-medium text-slate-800 leading-tight">{user.name}</h2>
+                <p className="text-slate-500 text-sm mb-5 mt-1">{user.email}</p>
+
+                <div className="flex justify-center gap-2 mb-6">
+                  <div className="bg-blue-50 border border-blue-300 text-blue-600 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm tracking-wider">
+                    {user.role}
+                  </div>
+                  {tier && (
+                    <div className={`px-3 py-1.5 rounded-full text-xs font-medium tracking-wider shadow-sm border ${tier.className}`}>
+                      {tier.label}
+                    </div>
+                  )}
+                </div>
+
+                {/* Hộp điểm số (Coins) mượt mà */}
+                <div className="bg-gradient-to-br from-yellow-50 to-orange-50/50 border border-yellow-200/50 rounded-[1.5rem] p-5 mb-6 shadow-sm relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 opacity-10 text-yellow-500">
+                    <Coins size={80} />
+                  </div>
+                  <p className="text-yellow-600 font-medium mb-1 tracking-widest relative z-10">Số dư hiện tại</p>
+                  <p className="text-3xl font-medium text-yellow-500 flex justify-center items-center relative z-10">
+                    <Coins size={35} className="mr-2 fill-yellow-200 drop-shadow-sm" />
+                    {Number(user.points || 0).toLocaleString()}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-white/60 hover:bg-red-50 text-slate-600 border hover:text-red-600 border-slate-300 hover:border-red-400 font-medium py-3.5 rounded-2xl flex justify-center items-center transition-all shadow-sm"
+                >
+                  <LogOut size={30} className="mr-2" /> Đăng xuất
+                </button>
               </div>
-              <h2 className="text-xl font-bold">{user.name}</h2>
-              <p className="text-slate-400 text-sm mb-4">{user.email}</p>
-
-              <div className="bg-slate-900/50 p-3 rounded-xl mb-2 text-blue-300 font-bold text-sm">
-                Vai tro: {user.role}
-              </div>
-              {tier && <div className={`p-2 rounded-xl mb-4 text-xs font-black uppercase ${tier.className}`}>Cap: {tier.label}</div>}
-
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-4">
-                <p className="text-yellow-500 text-xs font-bold mb-1">So du</p>
-                <p className="text-3xl font-black text-yellow-400 flex justify-center items-center">
-                  <Coins size={24} className="mr-2" /> {user.points}
-                </p>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="w-full text-slate-500 hover:text-red-400 font-medium py-2 flex justify-center items-center"
-              >
-                <LogOut size={16} className="mr-2" /> Dang xuat
-              </button>
             </div>
-          </div>
 
-          <div className="col-span-2">
-            <div className="bg-slate-800 border border-slate-700 rounded-3xl p-6 shadow-xl h-full flex flex-col min-h-[560px]">
-              <div className="flex space-x-2 mb-6 border-b border-slate-700 pb-4 overflow-x-auto scrollbar-hide">
-                <button
-                  onClick={() => setActiveTab('wallet')}
-                  className={`px-4 py-2 rounded-xl font-bold flex items-center whitespace-nowrap transition-all ${
-                    activeTab === 'wallet' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <Wallet size={18} className="mr-2" /> Vi Tien
-                </button>
-                <button
-                  onClick={() => setActiveTab('unlocked')}
-                  className={`px-4 py-2 rounded-xl font-bold flex items-center whitespace-nowrap transition-all ${
-                    activeTab === 'unlocked' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <BookOpen size={18} className="mr-2" /> Da Mua
-                </button>
-                <button
-                  onClick={() => setActiveTab('history')}
-                  className={`px-4 py-2 rounded-xl font-bold flex items-center whitespace-nowrap transition-all ${
-                    activeTab === 'history' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <Clock size={18} className="mr-2" /> Lich Su
-                </button>
-                <button
-                  onClick={() => setActiveTab('favorites')}
-                  className={`px-4 py-2 rounded-xl font-bold flex items-center whitespace-nowrap transition-all ${
-                    activeTab === 'favorites' ? 'bg-pink-600 text-white' : 'text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <Heart size={18} className="mr-2" /> Yeu Thich
-                </button>
-              </div>
+            {/* CỘT PHẢI: ACTIONS & CONTENT */}
+            <div className="lg:col-span-2">
+              <div className="bg-white/40 backdrop-blur-2xl border border-white/60 rounded-[2.5rem] p-4 sm:p-6 shadow-[0_8px_32px_rgba(0,0,0,0.04)] h-full flex flex-col min-h-[600px]">
 
-              <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
-                {loading ? (
-                  <p className="text-center text-slate-500 py-10">Dang tai...</p>
-                ) : (
-                  <>
-                    {activeTab === 'wallet' && (
-                      <div className="space-y-6">
-                        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4">
-                          <h3 className="font-bold text-white mb-3 flex items-center">
-                            <CreditCard size={18} className="mr-2 text-emerald-400" /> Tao lenh nap tien
+                {/* Segmented Control Tabs */}
+                <div className="flex p-1.5 bg-white/60 backdrop-blur-xl rounded-2xl border border-white mb-6 overflow-x-auto custom-scrollbar shadow-inner ">
+                  <button
+                    onClick={() => setActiveTab('account')}
+                    className={`flex-1 flex justify-center items-center whitespace-nowrap min-w-[120px] px-4 py-3 rounded-full font-medium text-sm transition-all duration-300 ${activeTab === 'account' ? 'bg-white text-slate-800 shadow-[0_2px_10px_rgba(0,0,0,0.05)] border-2 border-slate-300' : 'text-slate-500 hover:text-slate-700 hover:bg-white/40'
+                      }`}
+                  >
+                    <Settings size={16} className="mr-2" /> Cài đặt
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('wallet')}
+                    className={`flex-1 flex justify-center items-center whitespace-nowrap min-w-[120px] px-4 py-3 rounded-full font-medium text-sm transition-all duration-300 ${activeTab === 'wallet' ? 'bg-white text-emerald-600 shadow-[0_2px_10px_rgba(0,0,0,0.05)] border-2 border-emerald-300' : 'text-slate-500 hover:text-slate-700 hover:bg-white/4'
+                      }`}
+                  >
+                    <Wallet size={16} className="mr-2" /> Ví Tiền
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('unlocked')}
+                    className={`flex-1 flex justify-center items-center whitespace-nowrap min-w-[120px] px-4 py-3 rounded-full font-medium text-sm transition-all duration-300 ${activeTab === 'unlocked' ? 'bg-white text-blue-600 shadow-[0_2px_10px_rgba(0,0,0,0.05)] border-2 border-blue-300' : 'text-slate-500 hover:text-slate-700 hover:bg-white/4'
+                      }`}
+                  >
+                    <BookOpen size={16} className="mr-2" /> Đã Mua
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('history')}
+                    className={`flex-1 flex justify-center items-center whitespace-nowrap min-w-[120px] px-4 py-3 rounded-full font-medium text-sm transition-all duration-300 ${activeTab === 'history' ? 'bg-white text-indigo-600 shadow-[0_2px_10px_rgba(0,0,0,0.05)] border-2 border-indigo-300' : 'text-slate-500 hover:text-slate-700 hover:bg-white/4'
+                      }`}
+                  >
+                    <Clock size={16} className="mr-2" /> Lịch Sử
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('favorites')}
+                    className={`flex-1 flex justify-center items-center whitespace-nowrap min-w-[120px] px-4 py-3 rounded-full font-medium text-sm transition-all duration-300 ${activeTab === 'favorites' ? 'bg-white text-pink-600 shadow-[0_2px_10px_rgba(0,0,0,0.05)] border-2 border-pink-300' : 'text-slate-500 hover:text-slate-700 hover:bg-white/4'
+                      }`}
+                  >
+                    <Heart size={16} className="mr-2" /> Yêu Thích
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar pb-4 relative z-10">
+                  {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-blue-500 mb-4"></div>
+                      <p className="text-slate-400 font-medium">Đang tải dữ liệu...</p>
+                    </div>
+                  ) : (
+                    <div className="animate-fade-in">
+
+                      {/* --- TAB: ACCOUNT (Cài đặt) --- */}
+                      {activeTab === 'account' && (
+                        <div className="bg-white/60 border border-white rounded-[2rem] p-6 sm:p-8 shadow-sm">
+                          <h3 className="font-medium text-xl text-slate-800 mb-6 flex items-center">
+                            <Settings size={22} className="mr-2 text-slate-800" /> Cập nhật Hồ sơ
                           </h3>
-                          <div className="grid sm:grid-cols-3 gap-3">
-                            <input
-                              type="number"
-                              min={1000}
-                              value={depositAmount}
-                              onChange={(e) => setDepositAmount(Number(e.target.value))}
-                              className="sm:col-span-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
-                              placeholder="So diem nap"
-                            />
-                            <select
-                              value={depositMethod}
-                              onChange={(e) => setDepositMethod(e.target.value as 'BANK_TRANSFER' | 'EWALLET')}
-                              className="sm:col-span-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
-                            >
-                              <option value="BANK_TRANSFER">BANK_TRANSFER</option>
-                              <option value="EWALLET">EWALLET</option>
-                            </select>
+
+                          <form onSubmit={handleUpdateProfile} className="space-y-6">
+                            {/* Đổi Avatar */}
+                            <div>
+                              <label className="block text-sm font-medium text-slate-600 mb-3 ml-1">Ảnh đại diện</label>
+                              <div className="flex items-center gap-6">
+                                <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                                  {avatarPreview ? (
+                                    <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <UserIcon size={32} className="text-slate-400" />
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    onChange={handleAvatarChange}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 hover:border-blue-200 px-5 py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm flex items-center gap-2"
+                                  >
+                                    <ImagePlus size={18} /> Chọn ảnh mới
+                                  </button>
+                                  <p className="text-xs text-slate-400 mt-2">Định dạng JPEG, PNG, JPG. Tối đa 2MB.</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Đổi Tên */}
+                            <div>
+                              <label className="block text-sm font-medium text-slate-600 mb-2 ml-1">Tên hiển thị</label>
+                              <input
+                                type="text"
+                                required
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                className={inputClass}
+                                placeholder="Nhập tên của bạn"
+                              />
+                            </div>
+
+                            {/* Email (Readonly) */}
+                            <div>
+                              <label className="block text-sm font-medium text-slate-600 mb-2 ml-1">Email đăng nhập (Không thể đổi)</label>
+                              <input
+                                type="email"
+                                disabled
+                                value={user.email}
+                                className="w-full px-4 py-3 bg-slate-100/50 border border-slate-200 rounded-2xl text-slate-500 outline-none cursor-not-allowed"
+                              />
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100">
+                              <button
+                                type="submit"
+                                disabled={updatingProfile}
+                                className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-8 py-3.5 rounded-full font-medium shadow-md shadow-blue-500/20 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+                              >
+                                {updatingProfile ? (
+                                  <><div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> Đang lưu...</>
+                                ) : (
+                                  <><CheckCircle2 size={18} /> Lưu thay đổi</>
+                                )}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+
+                      {/* --- TAB: WALLET --- */}
+                      {activeTab === 'wallet' && (
+                        <div className="space-y-6">
+
+                          {/* Nạp tiền */}
+                          <div className="bg-white/60 border border-white rounded-[2rem] p-6 shadow-sm">
+                            <h3 className="font-medium text-lg text-emerald-500 mb-4 flex items-center">
+                              <CreditCard size={20} className="mr-2 text-emerald-500" /> Nạp điểm vào tài khoản
+                            </h3>
+                            <div className="grid sm:grid-cols-3 gap-4">
+                              <input
+                                type="number"
+                                min={1000}
+                                value={depositAmount}
+                                onChange={(e) => setDepositAmount(Number(e.target.value))}
+                                className={`sm:col-span-1 ${inputClass}`}
+                                placeholder="Số điểm cần nạp"
+                              />
+                              <select
+                                value={depositMethod}
+                                onChange={(e) => setDepositMethod(e.target.value as 'BANK_TRANSFER' | 'EWALLET')}
+                                className={`sm:col-span-1 ${inputClass}`}
+                              >
+                                <option value="BANK_TRANSFER">Chuyển khoản Ngân hàng</option>
+                                <option value="EWALLET">Ví điện tử (Momo, ZaloPay)</option>
+                              </select>
+                              <button
+                                onClick={handleCreatePaymentOrder}
+                                disabled={creatingOrder}
+                                className="sm:col-span-1 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-3 rounded-2xl font-bold shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-all flex justify-center items-center"
+                              >
+                                {creatingOrder ? 'Đang tạo...' : 'Tạo lệnh nạp'}
+                              </button>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-3 ml-1 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block">
+                              💡 Hệ thống sẽ tạo mã giao dịch đối soát để bạn chuyển khoản.
+                            </p>
+                          </div>
+
+                          {/* Rút tiền */}
+                          <div className="bg-white/60 border border-white rounded-[2rem] p-6 shadow-sm">
+                            <h3 className="font-medium text-lg text-cyan-500 mb-4 flex items-center">
+                              <Landmark size={20} className="mr-2 text-cyan-500" /> Yêu cầu Rút tiền (Dành cho Tác giả)
+                            </h3>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                              <input
+                                type="number"
+                                min={50000}
+                                value={withdrawAmount}
+                                onChange={(e) => setWithdrawAmount(Number(e.target.value))}
+                                className={inputClass}
+                                placeholder="Số điểm muốn rút (Tối thiểu 50.000)"
+                              />
+                              <select
+                                value={withdrawMethod}
+                                onChange={(e) => setWithdrawMethod(e.target.value as 'BANK_TRANSFER' | 'EWALLET')}
+                                className={inputClass}
+                              >
+                                <option value="BANK_TRANSFER">Nhận qua Ngân hàng</option>
+                                <option value="EWALLET">Nhận qua Ví điện tử</option>
+                              </select>
+                              <input
+                                type="text"
+                                value={withdrawAccountName}
+                                onChange={(e) => setWithdrawAccountName(e.target.value)}
+                                className={inputClass}
+                                placeholder="Tên chủ tài khoản / Tên ví"
+                              />
+                              <input
+                                type="text"
+                                value={withdrawAccountNumber}
+                                onChange={(e) => setWithdrawAccountNumber(e.target.value)}
+                                className={inputClass}
+                                placeholder="Số tài khoản / Số điện thoại ví"
+                              />
+                            </div>
                             <button
-                              onClick={handleCreatePaymentOrder}
-                              disabled={creatingOrder}
-                              className="sm:col-span-1 bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                              onClick={handleWithdrawRequest}
+                              disabled={requestingWithdraw}
+                              className="mt-4 w-full sm:w-auto bg-cyan-500 hover:bg-cyan-600 text-white px-8 py-3.5 rounded-2xl font-bold shadow-md shadow-cyan-500/20 disabled:opacity-50 transition-all"
                             >
-                              {creatingOrder ? 'Dang tao...' : 'Tao lenh nap'}
+                              {requestingWithdraw ? 'Đang xử lý...' : 'Gửi yêu cầu rút'}
                             </button>
                           </div>
-                          <p className="text-xs text-slate-500 mt-2">
-                            He thong se tao ma giao dich doi soat de ban nap qua ngan hang/vi dien tu.
-                          </p>
-                        </div>
 
-                        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4">
-                          <h3 className="font-bold text-white mb-3 flex items-center">
-                            <Landmark size={18} className="mr-2 text-cyan-400" /> Yeu cau rut tien
-                          </h3>
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            <input
-                              type="number"
-                              min={1000}
-                              value={withdrawAmount}
-                              onChange={(e) => setWithdrawAmount(Number(e.target.value))}
-                              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
-                              placeholder="So diem rut"
-                            />
-                            <select
-                              value={withdrawMethod}
-                              onChange={(e) => setWithdrawMethod(e.target.value as 'BANK_TRANSFER' | 'EWALLET')}
-                              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
-                            >
-                              <option value="BANK_TRANSFER">BANK_TRANSFER</option>
-                              <option value="EWALLET">EWALLET</option>
-                            </select>
-                            <input
-                              type="text"
-                              value={withdrawAccountName}
-                              onChange={(e) => setWithdrawAccountName(e.target.value)}
-                              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
-                              placeholder="Ten tai khoan/vi"
-                            />
-                            <input
-                              type="text"
-                              value={withdrawAccountNumber}
-                              onChange={(e) => setWithdrawAccountNumber(e.target.value)}
-                              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm"
-                              placeholder="So tai khoan/so vi"
-                            />
-                          </div>
-                          <button
-                            onClick={handleWithdrawRequest}
-                            disabled={requestingWithdraw}
-                            className="mt-3 w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
-                          >
-                            {requestingWithdraw ? 'Dang gui...' : 'Gui yeu cau rut'}
-                          </button>
-                        </div>
-
-                        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4">
-                          <h3 className="font-bold text-white mb-3 flex items-center">
-                            <Smartphone size={18} className="mr-2 text-blue-400" /> Lenh nap gan day
-                          </h3>
-                          {paymentOrders.length === 0 ? (
-                            <p className="text-slate-500 text-sm">Chua co lenh nap nao.</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {paymentOrders.map((order) => {
-                                const badge = orderStatusLabel(order.status);
-                                return (
-                                  <div key={order.id} className="p-3 rounded-xl border border-slate-700 bg-slate-800/60">
-                                    <div className="flex items-center justify-between gap-2 mb-1">
-                                      <span className="text-xs text-slate-300 font-bold">{order.providerOrderId || order.id}</span>
-                                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${badge.className}`}>{badge.text}</span>
+                          {/* Lịch sử giao dịch ví */}
+                          <div className="bg-white/60 border border-white rounded-[2rem] p-6 shadow-sm">
+                            <h3 className="font-medium text-lg text-blue-500 mb-4 flex items-center">
+                              <Smartphone size={20} className="mr-2 text-blue-500" /> Lịch sử giao dịch gần đây
+                            </h3>
+                            {paymentOrders.length === 0 ? (
+                              <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                                <p className="text-slate-400 font-medium">Chưa có giao dịch nào.</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {paymentOrders.map((order) => {
+                                  const badge = orderStatusLabel(order.status);
+                                  return (
+                                    <div key={order.id} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+                                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                        <span className="text-sm text-slate-800 font-medium">Mã: {order.providerOrderId || order.id}</span>
+                                        <span className={`text-[12px] font-medium tracking-wider px-2.5 py-1 rounded-full border-2 ${badge.className}`}>
+                                          {badge.text}
+                                        </span>
+                                      </div>
+                                      <div className="text-sm text-slate-600 space-y-1">
+                                        <div className="flex gap-2"><span className="text-slate-400">Số lượng:</span> <strong className="text-slate-800">{Number(order.amount).toLocaleString()} điểm</strong> | <span className="text-slate-400">Cổng:</span> {order.method}</div>
+                                        {order.bankReferenceCode && <div><span className="text-slate-400">Nội dung CK:</span> <strong className="text-blue-600">{order.bankReferenceCode}</strong></div>}
+                                        {order.checkoutUrl && (
+                                          <div className="mt-2 pt-2 border-t border-slate-100">
+                                            <a href={order.checkoutUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-xs font-medium bg-blue-50 text-blue-600 border border-blue-300 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors">
+                                              Mở trang thanh toán <ChevronRight size={14} className="ml-1" />
+                                            </a>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="text-xs text-slate-400">
-                                      <div>So tien: {order.amount} | Method: {order.method}</div>
-                                      {order.bankReferenceCode && <div>Ref: {order.bankReferenceCode}</div>}
-                                      {order.checkoutUrl && (
-                                        <div>
-                                          Checkout: <a href={order.checkoutUrl} className="text-blue-400 hover:underline">{order.checkoutUrl}</a>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {activeTab === 'unlocked' && (
-                      unlockedChapters.length === 0 ? (
-                        <p className="text-center text-slate-500 py-10">Chua co chuong nao duoc mua.</p>
-                      ) : (
-                        unlockedChapters.map((item, i) => (
-                          <div
-                            key={i}
-                            onClick={() => router.push(`/read/${item.chapterId}`)}
-                            className="flex items-center p-3 bg-slate-900 rounded-xl hover:border-blue-500/50 border border-slate-700 cursor-pointer group"
-                          >
-                            <img src={item.comicCover} className="w-12 h-16 object-cover rounded mr-4" alt="cover" />
-                            <div className="flex-1">
-                              <h4 className="font-bold group-hover:text-blue-400">{item.comicTitle}</h4>
-                              <p className="text-blue-500 text-sm">{item.chapterTitle}</p>
-                            </div>
-                            <ChevronRight className="text-slate-600" />
+                      {/* --- TAB: UNLOCKED --- */}
+                      {activeTab === 'unlocked' && (
+                        unlockedChapters.length === 0 ? (
+                          <div className="text-center py-16 bg-white/40 border border-dashed border-white/80 rounded-[2rem]">
+                            <BookOpen size={40} className="mx-auto text-slate-300 mb-4" />
+                            <p className="text-slate-500 font-medium">Bạn chưa mở khóa chương nào.</p>
                           </div>
-                        ))
-                      )
-                    )}
+                        ) : (
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            {unlockedChapters.map((item, i) => (
+                              <div
+                                key={i}
+                                onClick={() => router.push(`/read/${item.chapterId}`)}
+                                className="flex items-center p-3 sm:p-4 bg-white/60 border border-white hover:border-blue-200 rounded-[1.5rem] shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_25px_rgba(59,130,246,0.1)] cursor-pointer group transition-all"
+                              >
+                                <img src={item.comicCover} className="w-16 h-20 sm:h-24 object-cover rounded-xl shadow-sm mr-4" alt="cover" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-slate-800 group-hover:text-blue-600 truncate mb-1">{item.comicTitle}</h4>
+                                  <p className="text-blue-500 text-sm truncate">{item.chapterTitle}</p>
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-50 group-hover:bg-blue-50 group-hover:text-blue-500 group-hover:border-blue-300 transition-colors shrink-0 ml-2">
+                                  <ChevronRight size={18} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      )}
 
-                    {activeTab === 'history' && (
-                      readingHistory.length === 0 ? (
-                        <p className="text-center text-slate-500 py-10">Ban chua doc truyen nao gan day.</p>
-                      ) : (
-                        readingHistory.map((item, i) => (
-                          <div
-                            key={i}
-                            onClick={() => router.push(`/read/${item.chapterId}`)}
-                            className="flex items-center p-3 bg-slate-900 rounded-xl hover:border-indigo-500/50 border border-slate-700 cursor-pointer group"
-                          >
-                            <img src={item.comic.coverUrl} className="w-12 h-16 object-cover rounded mr-4" alt="cover" />
-                            <div className="flex-1">
-                              <h4 className="font-bold group-hover:text-indigo-400 line-clamp-1">{item.comic.title}</h4>
-                              <p className="text-slate-400 text-sm">
-                                Dang doc: <span className="text-indigo-400">{item.chapter.title}</span>
-                              </p>
-                              <p className="text-slate-600 text-[10px] mt-1">Cap nhat: {new Date(item.updatedAt).toLocaleString('vi-VN')}</p>
-                            </div>
-                            <ChevronRight className="text-slate-600" />
+                      {/* --- TAB: HISTORY --- */}
+                      {activeTab === 'history' && (
+                        readingHistory.length === 0 ? (
+                          <div className="text-center py-16 bg-white/40 border border-dashed border-white/80 rounded-[2rem]">
+                            <Clock size={40} className="mx-auto text-slate-300 mb-4" />
+                            <p className="text-slate-500 font-medium">Bạn chưa đọc truyện nào gần đây.</p>
                           </div>
-                        ))
-                      )
-                    )}
+                        ) : (
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            {readingHistory.map((item, i) => (
+                              <div
+                                key={i}
+                                onClick={() => router.push(`/read/${item.chapterId}`)}
+                                className="flex items-center p-3 sm:p-4 bg-white/60 border border-white hover:border-indigo-200 rounded-[1.5rem] shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_25px_rgba(99,102,241,0.1)] cursor-pointer group transition-all"
+                              >
+                                <img src={item.comic.coverUrl} className="w-16 h-20 sm:h-24 object-cover rounded-xl shadow-sm mr-4" alt="cover" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-slate-800 group-hover:text-indigo-600 line-clamp-1 mb-1">{item.comic.title}</h4>
+                                  <p className="text-slate-500 text-xs mb-1">
+                                    Đang đọc: <span className="text-indigo-500 font-bold">{item.chapter.title}</span>
+                                  </p>
+                                  <p className="text-slate-400 text-[12px] font-medium bg-slate-100 w-fit px-2 py-0.5 rounded-full border border-slate-300">
+                                    {new Date(item.updatedAt).toLocaleDateString('vi-VN')}
+                                  </p>
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-50 group-hover:bg-indigo-50 group-hover:text-indigo-500 group-hover:border-indigo-300 transition-colors shrink-0 ml-2">
+                                  <ChevronRight size={18} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      )}
 
-                    {activeTab === 'favorites' && (
-                      favorites.length === 0 ? (
-                        <p className="text-center text-slate-500 py-10">Chua co truyen yeu thich.</p>
-                      ) : (
-                        favorites.map((item, i) => (
-                          <div
-                            key={i}
-                            onClick={() => router.push(`/comic/${item.comicId}`)}
-                            className="flex items-center p-3 bg-slate-900 rounded-xl hover:border-pink-500/50 border border-slate-700 cursor-pointer group"
-                          >
-                            <img src={item.coverUrl} className="w-12 h-16 object-cover rounded mr-4" alt="cover" />
-                            <div className="flex-1">
-                              <h4 className="font-bold group-hover:text-pink-400">{item.title}</h4>
-                              <p className="text-slate-500 text-sm">{item.authorName}</p>
-                            </div>
-                            <ChevronRight className="text-slate-600" />
+                      {/* --- TAB: FAVORITES --- */}
+                      {activeTab === 'favorites' && (
+                        favorites.length === 0 ? (
+                          <div className="text-center py-16 bg-white/40 border border-dashed border-white/80 rounded-[2rem]">
+                            <Heart size={40} className="mx-auto text-pink-200 mb-4" />
+                            <p className="text-slate-500 font-medium">Chưa có truyện yêu thích.</p>
                           </div>
-                        ))
-                      )
-                    )}
-                  </>
-                )}
+                        ) : (
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            {favorites.map((item, i) => (
+                              <div
+                                key={i}
+                                onClick={() => router.push(`/comic/${item.comicId}`)}
+                                className="flex items-center p-3 sm:p-4 bg-white/60 border border-white hover:border-pink-200 rounded-[1.5rem] shadow-[0_4px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_25px_rgba(236,72,153,0.1)] cursor-pointer group transition-all"
+                              >
+                                <img src={item.coverUrl} className="w-16 h-20 sm:h-24 object-cover rounded-xl shadow-sm mr-4" alt="cover" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-slate-800 group-hover:text-pink-600 line-clamp-2 mb-1">{item.title}</h4>
+                                  <p className="text-slate-500 text-xs">{item.authorName}</p>
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-50 group-hover:bg-pink-50 group-hover:text-pink-500 group-hover:border-pink-300 transition-colors shrink-0 ml-2">
+                                  <Heart size={16} className="group-hover:fill-pink-500" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      )}
+
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
 
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            .scrollbar-hide::-webkit-scrollbar { display: none; }
-            .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-            .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+            .custom-scrollbar::-webkit-scrollbar { height: 0px; width: 4px; display: none; }
+            .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            .custom-scrollbar:hover::-webkit-scrollbar { display: block; }
+            .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 10px; }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.6); }
+
+            @keyframes fade-in {
+              from { opacity: 0; transform: translateY(15px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+              animation: fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
           `,
-        }}
-      />
+          }}
+        />
+      </div>
     </div>
   );
 }

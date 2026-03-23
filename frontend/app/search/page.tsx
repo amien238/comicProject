@@ -251,7 +251,8 @@ function SearchContent() {
                   </div>
                 ))}
               </div>
-            ) : (
+            ) : 
+            (
               <div className="bg-white/50 backdrop-blur-2xl rounded-[2.5rem] p-12 text-center border border-white/60 mt-2 shadow-[0_8px_32px_rgba(0,0,0,0.04)] flex flex-col items-center">
                 <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6 shadow-inner">
                   <Filter size={32} className="text-blue-600" />

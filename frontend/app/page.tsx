@@ -57,10 +57,10 @@ export default function Home() {
         if (user) {
           try {
             const history = await historyApi.getMyHistory();
-            const favoritesData = await userApi.getFavorites().catch(() => []);
+            const favs = await userApi.getFavorites().catch(() => []);
 
             setRecentHistory(Array.isArray(history) ? history.slice(0, 4) : []);
-            setFavorites(Array.isArray(favoritesData) ? favoritesData : []);
+            setFavorites(Array.isArray(favs) ? favs : []);
           } catch (err) {
             setRecentHistory([]);
             setFavorites([]);
@@ -82,14 +82,14 @@ export default function Home() {
   const topComics = [...comics].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 10);
 
   // Logic tự động lướt Banner chậm lại: 5 giây (5000ms)
-  useEffect(() => {
-    if (topComics.length === 0) return;
-    const timer = setInterval(() => {
-      // Tăng index để tạo hiệu ứng cuộn danh sách (lấy 3 item liên tiếp)
-      setCurrentTopIndex((prevIndex) => (prevIndex + 1) % topComics.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [topComics.length]);
+  // useEffect(() => {
+  //   if (topComics.length === 0) return;
+  //   const timer = setInterval(() => {
+  //     // Tăng index để tạo hiệu ứng cuộn danh sách (lấy 3 item liên tiếp)
+  //     setCurrentTopIndex((prevIndex) => (prevIndex + 1) % topComics.length);
+  //   }, 5000);
+  //   return () => clearInterval(timer);
+  // }, [topComics.length]);
 
   const displayComics = selectedTag
     ? comics.filter(c => c.tags?.some((t: any) => t.id === selectedTag))
@@ -158,12 +158,12 @@ export default function Home() {
         )}
 
         {/* 🌟 BANNER CHIA ĐÔI: TEXT (Trái) & DANH SÁCH TOP TRUYỆN AUTO-SLIDE (Phải) 🌟 */}
-        <div className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] p-8 sm:p-12 mb-14 flex flex-col md:flex-row items-center justify-between border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden group">
+        <div className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] p-6 sm:p-12 mb-14 flex flex-col md:flex-row items-center justify-between border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden group/banner">
 
-          <div className="absolute top-0 right-1/4 w-80 h-80 bg-gradient-to-tr from-blue-300 to-teal-200 rounded-full blur-[80px] opacity-30 group-hover:opacity-50 transition-opacity duration-700"></div>
+          <div className="absolute top-0 right-1/4 w-80 h-80 bg-gradient-to-tr from-blue-300 to-teal-200 rounded-full blur-[80px] opacity-30 group-hover/banner:opacity-50 transition-opacity duration-700"></div>
 
-          {/* Nửa Trái: Tiêu đề */}
-          <div className="z-10 relative md:w-5/12 w-full mb-16 md:mb-0">
+          {/* Nửa Trái: Tiêu đề (Ẩn trên mobile để tối ưu không gian hiển thị truyện) */}
+          <div className="z-10 relative md:w-5/12 w-full hidden md:block">
             <div className="inline-block bg-white/70 backdrop-blur-sm border border-white/80 text-blue-600 font-bold text-xs px-3 py-1 rounded-full mb-4 shadow-sm">
               ✨ Nền tảng thế hệ mới
             </div>
@@ -176,7 +176,7 @@ export default function Home() {
             <p className="text-slate-600 mb-8 max-w-md font-medium text-lg leading-relaxed">
               Khám phá hàng ngàn chương truyện bản quyền. Hỗ trợ tác giả yêu thích của bạn trực tiếp qua hệ thống điểm thưởng.
             </p>
-            <button className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-500 hover:to-teal-400 text-white px-8 py-3.5 rounded-full shadow-[0_10px_20px_rgba(59,130,246,0.3)] hover:shadow-[0_15px_30px_rgba(59,130,246,0.4)] hover:-translate-y-1 transition-all duration-300">
+            <button className="bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-500 hover:to-teal-400 text-white px-8 py-3.5 rounded-full font-bold shadow-[0_10px_20px_rgba(59,130,246,0.3)] hover:shadow-[0_15px_30px_rgba(59,130,246,0.4)] hover:-translate-y-1 transition-all duration-300">
               <a href="#list-truyen">
                 Khám phá ngay
               </a>
@@ -184,7 +184,7 @@ export default function Home() {
           </div>
 
           {/* Nửa Phải: Danh sách Top 3 truyện (Poster bự & Chữ số Glassmorphism nổi lên trên) */}
-          <div className="z-10 relative md:w-7/12 w-full flex flex-row gap-3 sm:gap-4 justify-center md:justify-end items-end h-full mt-6 md:mt-0">
+          <div className="z-10 relative w-full md:w-7/12 flex flex-row gap-3 sm:gap-4 justify-center md:justify-end items-end h-full">
             {topComics.length > 0 && Array.from({ length: Math.min(3, topComics.length) }).map((_, offset) => {
               const index = (currentTopIndex + offset) % topComics.length;
               const comic = topComics[index];
@@ -194,22 +194,22 @@ export default function Home() {
                 <div
                   key={`${comic.id}-${currentTopIndex}`} // Key đổi kích hoạt animate-fade-in
                   onClick={() => router.push(`/comic/${comic.id}`)}
-                  className="animate-fade-in relative group cursor-pointer mt-8 sm:mt-12"
+                  className="animate-fade-in relative group cursor-pointer mt-2 md:mt-12"
                 >
                   {/* Poster Truyện - To hơn và dài hơn */}
-                  <div className="relative z-10 w-36 h-56 sm:w-[13rem] sm:h-[19rem] rounded-[2rem] overflow-hidden shadow-[0_15px_35px_rgba(0,0,0,0.15)] border border-white/60 group-hover:shadow-[0_25px_50px_rgba(0,0,0,0.25)] group-hover:-translate-y-3 transition-all duration-500">
-                    <img src={comic.coverUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="cover" />
+                  <div className="relative z-10 w-28 sm:w-36 h-44 sm:h-56 md:w-[13rem] md:h-[19rem] rounded-2xl md:rounded-[2rem] overflow-hidden shadow-[0_15px_35px_rgba(0,0,0,0.15)] border border-white/60 group-hover:shadow-[0_25px_50px_rgba(0,0,0,0.25)] group-hover:-translate-y-3 transition-all duration-500">
+                    <img src={comic.coverUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 bg-slate-100" alt="cover" />
 
                     {/* Gradient Overlay mờ khi hover */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </div>
 
                   {/* Chữ số thứ tự siêu to nằm TRÊN poster (z-20) theo style Text Kính mờ */}
-                  <div className="absolute -bottom-6 -left-6 sm:-bottom-10 sm:-left-10 z-20 flex items-center justify-center group-hover:-translate-y-3 transition-all duration-500 pointer-events-none">
+                  <div className="absolute -bottom-4 -left-4 sm:-bottom-10 sm:-left-10 z-20 flex items-center justify-center group-hover:-translate-y-3 transition-all duration-500 pointer-events-none">
                     {/* Text viền sắc nét, ruột mờ */}
-                    <span className={`relative text-[75px] sm:text-[120px] font-black italic drop-shadow-[0_10px_20px_rgba(0,0,0,0.2)] leading-none tracking-tighter ${index === 0 ? 'text-purple-500/10 ' :
-                      index === 1 ? 'text-teal-400/10 ' :
-                        index === 2 ? 'text-slate-500/10 ' :
+                    <span className={`relative text-[60px] sm:text-[120px] font-black italic drop-shadow-[0_10px_20px_rgba(0,0,0,0.2)] leading-none tracking-tighter ${index === 0 ? 'text-purple-500/10 group-hover:text-purple-500/30' :
+                      index === 1 ? 'text-teal-400/10 group-hover:text-teal-400/30' :
+                        index === 2 ? 'text-slate-500/10 group-hover:text-slate-500/30' :
                           'text-slate-200/50'
                       }`}
                       style={{ WebkitTextStroke: '1px rgba(255,255,255,0.95)' }}>
@@ -266,58 +266,60 @@ export default function Home() {
           <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-500"></div></div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5 sm:gap-6">
-            {displayComics.map(comic => (
-              <div
-                key={comic.id}
-                onClick={() => router.push(`/comic/${comic.id}`)}
-                className="bg-white/60 backdrop-blur-xl border border-white/80 p-2.5 rounded-[1.5rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1.5 transition-all duration-300 group cursor-pointer flex flex-col relative"
-              >
-                <div className="aspect-[3/4] relative rounded-2xl overflow-hidden mb-3 bg-slate-100">
-                  <img src={comic.coverUrl} className="w-full h-full object-cover" alt="cover" />
+            {displayComics.map(comic => {
+              const isFav = user && favorites.some((fav: any) => fav.comicId === comic.id);
+              return (
+                <div
+                  key={comic.id}
+                  onClick={() => router.push(`/comic/${comic.id}`)}
+                  className="bg-white/60 backdrop-blur-xl border border-white/80 p-2.5 rounded-[1.5rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.08)] hover:-translate-y-1.5 transition-all duration-300 group cursor-pointer flex flex-col relative"
+                >
+                  <div className="aspect-[3/4] relative rounded-2xl overflow-hidden mb-3 bg-slate-100">
+                    <img src={comic.coverUrl} className="w-full h-full object-cover" alt="cover" />
 
-                  {/* Thay thế chữ Hot bằng Icon trái tim (nếu đã yêu thích) nằm ở góc trái */}
-                  <div className="absolute top-2 left-2 flex flex-col gap-1.5 z-10">
-                    
-                    {(comic.isFavorited || (user && comic.favorites?.some((f: any) => f.userId === user.id))) && (
-                      <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-full shadow-sm w-fit flex items-center justify-center">
-                        <Heart size={14} className="fill-pink-500 text-pink-500" />
-                      </div>
-                    )}
+                    {/* Thay thế chữ Hot bằng Icon trái tim (nếu đã yêu thích) nằm ở góc trái */}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1.5 z-10">
+                      {isFav && (
+                        <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-full shadow-sm w-fit flex items-center justify-center">
+                          <Heart size={14} className="fill-pink-500 text-pink-500" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nhãn Rating Góc phải */}
+                    <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-md text-amber-500 text-[11px] font-extrabold px-2 py-1 rounded-lg flex items-center shadow-sm z-10">
+                      <Star size={11} className="mr-1 fill-amber-500" /> {comic.averageRating || '5.0'}
+                    </div>
+
+                    {/* Hiện Số Chap đè lên góc dưới poster */}
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent p-3 pt-12 z-10">
+                      <span className="bg-slate-100/60 px-2 py-1 rounded-lg border border-slate-200/50 text-xs">
+                        {timeAgo(comic.updatedAt || comic.createdAt)}
+                      </span>
+                    </div>
+
+                    {/* LỚP OVERLAY KHI HOVER */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 p-4 flex flex-col justify-center items-center text-center z-20" />
                   </div>
 
-                  {/* Nhãn Rating Góc phải */}
-                  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-md text-amber-500 text-[11px] font-extrabold px-2 py-1 rounded-lg flex items-center shadow-sm z-10">
-                    <Star size={11} className="mr-1 fill-amber-500" /> {comic.averageRating || '5.0'}
+                  {/* Thông tin phụ nằm bên dưới poster */}
+                  <div className="px-1 flex-1 flex flex-col justify-between">
+                    <h3 className="font-bold text-[15px] text-slate-800 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors mb-2">
+                      {comic.title}
+                    </h3>
+                    <div className="flex justify-between items-center text-[11px] text-slate-500 font-semibold mt-auto">
+                      <span className="bg-purple-400/10 px-2 py-1 rounded-lg border border-purple-500/50 text-purple-600">
+                        {comic.chapterCount ?? comic.chapters?.length ?? 0} chap
+                      </span>
+                      <span className="flex items-center gap-1.5 text-blue-500">
+                        <Eye size={13} className="text-blue-500" />
+                        {comic.views || 0}
+                      </span>
+                    </div>
                   </div>
-
-                  {/* Hiện Số Chap đè lên góc dưới poster */}
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent p-3 pt-12 z-10">
-                    <span className="bg-slate-100/60 px-2 py-1 rounded-lg border border-slate-200/50 text-xs">
-                      {timeAgo(comic.updatedAt || comic.createdAt)}
-                    </span>
-                  </div>
-
-                  {/* LỚP OVERLAY KHI HOVER */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 p-4 flex flex-col justify-center items-center text-center z-20" />
                 </div>
-
-                {/* Thông tin phụ nằm bên dưới poster */}
-                <div className="px-1 flex-1 flex flex-col justify-between">
-                  <h3 className="font-bold text-[15px] text-slate-800 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors mb-2">
-                    {comic.title}
-                  </h3>
-                  <div className="flex justify-between items-center text-[11px] text-slate-500 font-semibold mt-auto">
-                    <span className="bg-purple-400/10 px-2 py-1 rounded-lg border border-purple-500/50 text-purple-600">
-                      Chap {comic.latestChapter?.chapterNumber ?? comic.chapters?.length ?? '0'}
-                    </span>
-                    <span className="flex items-center gap-1.5 text-blue-500">
-                      <Eye size={13} className="text-blue-500" />
-                      {comic.views || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
