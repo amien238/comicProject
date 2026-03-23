@@ -1524,6 +1524,85 @@ const getAccountingSummary = async (req, res) => {
     return res.status(500).json({ error: 'Server error while fetching accounting summary.' });
   }
 };
+const reviewPaymentOrder = async (req, res) => {
+  try {
+    const reviewerId = requireAuthUserId(req, res);
+    if (!reviewerId) return;
+
+    const { id, approve } = req.body;
+    if (!id) return res.status(400).json({ error: 'Order ID is required.' });
+
+    const result = await prisma.$transaction(async (tx) => {
+      const order = await tx.paymentOrder.findUnique({ where: { id } });
+      if (!order) throw new Error('ORDER_NOT_FOUND');
+      if (order.status !== 'PENDING') throw new Error('ORDER_ALREADY_PROCESSED');
+
+      if (approve) {
+        // 1. Cập nhật User Point
+        await tx.user.update({
+          where: { id: order.userId },
+          data: { points: { increment: order.amount }, totalDeposited: { increment: order.amount } }
+        });
+        
+        // 2. Cập nhật Trạng thái Order
+        await tx.paymentOrder.update({
+          where: { id },
+          data: { status: 'PAID', paidAt: new Date() }
+        });
+
+        // 3. Tạo Transaction Audit Log (Nhật ký hệ thống)
+        await tx.transaction.create({
+          data: {
+            userId: order.userId,
+            amount: order.amount,
+            type: 'DEPOSIT_APPROVED',
+            status: 'SUCCESS',
+            referenceCode: order.bankReferenceCode || order.providerOrderId,
+            description: `Manual approval by Accountant for order ${order.id}`
+          }
+        });
+
+        // 4. 🔥 BỔ SUNG: TẠO NHẬT KÝ ĐỐI SOÁT (RECONCILIATION) CHO DUYỆT TAY
+        await tx.reconciliationEvent.create({
+          data: {
+            provider: 'MANUAL_ACCOUNTANT',
+            providerOrderId: order.providerOrderId || order.id,
+            amount: order.amount,
+            status: 'SUCCESS',
+            matchedOrderId: order.id, // Đã khớp nối thành công với đơn nạp
+            reconciliationNote: `Duyệt thủ công bởi Admin/Kế toán (${reviewerId})`,
+          }
+        });
+
+      } else {
+        // Nếu Từ chối đơn
+        await tx.paymentOrder.update({
+          where: { id },
+          data: { status: 'CANCELED' }
+        });
+
+        // Tạo đối soát cho việc Từ chối (Tùy chọn, giúp minh bạch)
+        await tx.reconciliationEvent.create({
+          data: {
+            provider: 'MANUAL_ACCOUNTANT',
+            providerOrderId: order.providerOrderId || order.id,
+            amount: order.amount,
+            status: 'FAILED',
+            reconciliationNote: `Đã từ chối bởi Admin/Kế toán (${reviewerId})`,
+          }
+        });
+      }
+      return order;
+    });
+
+    return res.json({ message: approve ? 'Đã duyệt nạp tiền thành công!' : 'Đã từ chối đơn hàng.' });
+  } catch (error) {
+    if (error.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Không tìm thấy đơn.' });
+    if (error.message === 'ORDER_ALREADY_PROCESSED') return res.status(400).json({ error: 'Đơn này đã được xử lý trước đó.' });
+    return res.status(500).json({ error: 'Lỗi server khi duyệt đơn nạp.' });
+  }
+};
+
 
 module.exports = {
   deposit,
@@ -1540,5 +1619,6 @@ module.exports = {
   buyChapter,
   listReconciliation,
   closeAccountingPeriod,
-  getAccountingSummary,
+  getAccountingSummary, 
+  reviewPaymentOrder,
 };

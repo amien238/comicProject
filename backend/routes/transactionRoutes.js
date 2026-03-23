@@ -23,5 +23,6 @@ router.get('/audit', protect, isAccounter, transactionController.listTransaction
 router.get('/reconciliation', protect, isAccounter, transactionController.listReconciliation);
 router.post('/period/close', protect, isAccounter, transactionController.closeAccountingPeriod);
 router.get('/accounting/summary', protect, isAccounter, transactionController.getAccountingSummary);
+router.post('/payment/review', protect, isAccounter, transactionController.reviewPaymentOrder);
 
 module.exports = router;

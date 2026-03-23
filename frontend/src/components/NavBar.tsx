@@ -223,7 +223,7 @@ export default function Navbar({ onGoHome, onOpenAuthModal }: NavbarProps) {
                 </div>
                 <div className="hidden sm:flex flex-col leading-tight justify-center">
                   <span className="font-bold text-sm text-slate-700">{user.name}</span>
-                  {tier && <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded shadow-sm w-fit ${tier.className}`}>{tier.label}</span>}
+                  {tier && <span className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded-full shadow-sm w-fit ${tier.className}`}>{tier.label}</span>}
                 </div>
               </div>
 

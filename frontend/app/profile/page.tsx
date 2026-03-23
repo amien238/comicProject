@@ -17,7 +17,7 @@ import {
   User as UserIcon,
   Settings,
   CheckCircle2,
-  ImagePlus
+  ImagePlus, QrCode, Copy, X
 } from 'lucide-react';
 
 import Navbar from '../../src/components/NavBar';
@@ -26,6 +26,11 @@ import { historyApi, transactionApi, userApi, uploadApi } from '../../src/servic
 import { resolveUserTier } from '../../src/utils/userTier';
 
 type ProfileTab = 'account' | 'wallet' | 'unlocked' | 'history' | 'favorites';
+
+const MY_BANK_BIN = "970407"
+const MY_BANK_ACCOUNT = "1108191310"
+const MY_ACCOUNT_NAME = "Đinh Thị Ngọc Trâm"
+
 
 const orderStatusLabel = (status: string) => {
   const safeStatus = String(status || '').toUpperCase();
@@ -62,6 +67,9 @@ export default function ProfilePage() {
   // Wallet States
   const [depositAmount, setDepositAmount] = useState(50000);
   const [depositMethod, setDepositMethod] = useState<'BANK_TRANSFER' | 'EWALLET'>('BANK_TRANSFER');
+
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [currentPendingOrder, setCurrentPendingOrder] = useState<any>(null);
 
   const [withdrawAmount, setWithdrawAmount] = useState(50000);
   const [withdrawMethod, setWithdrawMethod] = useState<'BANK_TRANSFER' | 'EWALLET'>('BANK_TRANSFER');
@@ -139,9 +147,22 @@ export default function ProfilePage() {
       //   avatar: newAvatarUrl
       // });
 
-      alert('Cập nhật hồ sơ thành công!');
+      // Sử dụng Custom Modal Message thay vì alert mặc định
+      const msgBox = document.createElement('div');
+      msgBox.className = "fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in";
+      msgBox.innerHTML = `
+        <div class="bg-white rounded-3xl p-8 shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 border border-slate-100 text-center">
+          <div class="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-4"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+          <h3 class="text-xl font-bold text-slate-800 mb-2">Thành công!</h3>
+          <p class="text-slate-500 mb-6">Hồ sơ của bạn đã được cập nhật.</p>
+          <button id="close-msg-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-2xl transition-colors">Đóng</button>
+        </div>
+      `;
+      document.body.appendChild(msgBox);
+      document.getElementById('close-msg-btn')?.addEventListener('click', () => document.body.removeChild(msgBox));
+
       if (refreshUser) await refreshUser();
-      setAvatarFile(null); // reset file state
+      setAvatarFile(null);
     } catch (error: any) {
       alert(error.message || 'Cập nhật thất bại. Vui lòng thử lại.');
     } finally {
@@ -163,6 +184,12 @@ export default function ProfilePage() {
         method: depositMethod,
       });
 
+      const newOrder = result?.order;
+      if (newOrder) {
+        setCurrentPendingOrder(newOrder);
+        setShowQRModal(true);
+      }
+
       alert(`Tạo lệnh nạp thành công: ${result?.order?.providerOrderId || result?.order?.id || ''}`);
       const orders = await transactionApi.getMyPaymentOrders(30).catch(() => []);
       setPaymentOrders(Array.isArray(orders) ? orders : []);
@@ -173,10 +200,38 @@ export default function ProfilePage() {
     }
   };
 
+  // Hàm Copy siêu tương thích (Hỗ trợ cả iFrame)
+  const copyToClipboard = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    // Tàng hình thẻ textarea
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      document.execCommand('copy');
+
+      // Hiển thị thông báo nhỏ ở góc dưới thay vì alert cồng kềnh
+      const toast = document.createElement('div');
+      toast.className = "fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-[300] font-medium text-sm animate-fade-in flex items-center gap-2";
+      toast.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Đã sao chép!`;
+      document.body.appendChild(toast);
+      setTimeout(() => document.body.removeChild(toast), 2000);
+
+    } catch (err) {
+      console.error('Fallback: Oops, unable to copy', err);
+    }
+    document.body.removeChild(textArea);
+  };
+
   const handleWithdrawRequest = async () => {
     if (requestingWithdraw) return;
-    if (!Number.isInteger(withdrawAmount) || withdrawAmount <= 0) {
-      alert('Số điểm rút phải là số nguyên dương lớn hơn 0');
+    if (!Number.isInteger(withdrawAmount) || withdrawAmount < 50000) {
+      alert('Số điểm rút tối thiểu là 50,000');
       return;
     }
     if (!withdrawAccountNumber.trim()) {
@@ -235,6 +290,7 @@ export default function ProfilePage() {
       <div className="relative z-20">
         <Navbar onGoHome={() => router.push('/')} onOpenAuthModal={() => { }} />
       </div>
+
       <div className="min-h-screen bg-[#F4F7F9] text-slate-800 font-sans pb-20 relative overflow-hidden selection:bg-blue-500/30">
         <div className='h-15' />
         {/* iOS Background Blurred Orbs */}
@@ -449,11 +505,11 @@ export default function ProfilePage() {
                             <div className="grid sm:grid-cols-3 gap-4">
                               <input
                                 type="number"
-                                min={1000}
+                                min={10000}
                                 value={depositAmount}
                                 onChange={(e) => setDepositAmount(Number(e.target.value))}
                                 className={`sm:col-span-1 ${inputClass}`}
-                                placeholder="Số điểm cần nạp"
+                                placeholder="Số điểm cần nạp (Từ 10,000đ)"
                               />
                               <select
                                 value={depositMethod}
@@ -536,21 +592,37 @@ export default function ProfilePage() {
                                 {paymentOrders.map((order) => {
                                   const badge = orderStatusLabel(order.status);
                                   return (
-                                    <div key={order.id} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div key={order.id} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                                      {/* Highlight cho đơn PENDING */}
+                                      {order.status === 'PENDING' ? (
+                                        <div className="absolute top-0 left-0 w-2.5 h-full bg-amber-400"></div>
+                                      ) : (
+                                        <div className="absolute top-0 left-0 w-2.5 h-full bg-emerald-400"></div>
+                                      )}
+
                                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                                         <span className="text-sm text-slate-800 font-medium">Mã: {order.providerOrderId || order.id}</span>
-                                        <span className={`text-[12px] font-medium tracking-wider px-2.5 py-1 rounded-full border-2 ${badge.className}`}>
+                                        <span className={`text-[13px] font-medium tracking-wider px-2.5 py-1 rounded-full border ${badge.className}`}>
                                           {badge.text}
                                         </span>
                                       </div>
                                       <div className="text-sm text-slate-600 space-y-1">
-                                        <div className="flex gap-2"><span className="text-slate-400">Số lượng:</span> <strong className="text-slate-800">{Number(order.amount).toLocaleString()} điểm</strong> | <span className="text-slate-400">Cổng:</span> {order.method}</div>
-                                        {order.bankReferenceCode && <div><span className="text-slate-400">Nội dung CK:</span> <strong className="text-blue-600">{order.bankReferenceCode}</strong></div>}
-                                        {order.checkoutUrl && (
-                                          <div className="mt-2 pt-2 border-t border-slate-100">
-                                            <a href={order.checkoutUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-xs font-medium bg-blue-50 text-blue-600 border border-blue-300 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors">
-                                              Mở trang thanh toán <ChevronRight size={14} className="ml-1" />
-                                            </a>
+                                        <div className="flex gap-2">
+                                          <span className="text-slate-400">Số tiền:</span> <strong className="text-emerald-600">{Number(order.amount).toLocaleString()} VNĐ</strong>
+                                        </div>
+
+                                        {/* NÚT QUÉT MÃ NẾU ĐANG PENDING */}
+                                        {order.status === 'PENDING' && (
+                                          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+                                            <button
+                                              onClick={() => {
+                                                setCurrentPendingOrder(order);
+                                                setShowQRModal(true);
+                                              }}
+                                              className="bg-emerald-50 text-emerald-600 hover:bg-emerald-400 hover:text-white px-4 py-2 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 border border-emerald-200/50"
+                                            >
+                                              <QrCode size={14} /> Quét mã thanh toán
+                                            </button>
                                           </div>
                                         )}
                                       </div>
@@ -662,6 +734,65 @@ export default function ProfilePage() {
             </div>
           </div>
         </main>
+
+        {/* ========================================== */}
+        {/* 🚀 MODAL QR CODE THANH TOÁN (GLASSMORPHISM) */}
+        {/* ========================================== */}
+        {showQRModal && currentPendingOrder && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity animate-fade-in" onClick={() => setShowQRModal(false)}></div>
+
+            <div className="bg-white/90 backdrop-blur-2xl border border-white p-6 sm:p-8 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] w-full max-w-sm relative z-10 animate-fade-in flex flex-col items-center text-center">
+
+              <button onClick={() => setShowQRModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-red-500 hover:text-white transition-colors">
+                <X size={18} />
+              </button>
+
+              <h2 className="text-xl font-black text-slate-800 mb-1 mt-2">Thanh toán nạp điểm</h2>
+              <p className="text-sm text-slate-500 mb-6">Mở app ngân hàng quét mã QR bên dưới</p>
+
+              {/* Khối chứa ảnh QR tự động */}
+              <div className="bg-white p-3 rounded-[2rem] shadow-sm border border-slate-100 mb-6">
+                <img
+                  src={`https://img.vietqr.io/image/${MY_BANK_BIN}-${MY_BANK_ACCOUNT}-compact2.png?amount=${currentPendingOrder.amount}&addInfo=${currentPendingOrder.bankReferenceCode || currentPendingOrder.id}&accountName=${MY_ACCOUNT_NAME}`}
+                  alt="VietQR"
+                  className="w-full h-auto rounded-2xl"
+                />
+              </div>
+
+              {/* Chi tiết chuyển khoản */}
+              <div className="w-full space-y-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-left">
+                <div>
+                  <p className="text-[14px] font-medium text-slate-400 tracking-wider">Số tiền cần chuyển</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-emerald-600 text-lg">{Number(currentPendingOrder.amount).toLocaleString()} VNĐ</p>
+                    <button onClick={() => copyToClipboard(currentPendingOrder.amount.toString())} className="text-slate-400 hover:text-blue-500 p-1 transition-colors"><Copy size={16} /></button>
+                  </div>
+                </div>
+                <div className="h-px bg-slate-200/60"></div>
+                <div>
+                  <p className="text-[14px] font-medium text-slate-400 tracking-wider">Nội dung chuyển khoản</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-blue-600 text-base">{currentPendingOrder.bankReferenceCode || currentPendingOrder.id}</p>
+                    <button onClick={() => copyToClipboard(currentPendingOrder.bankReferenceCode || currentPendingOrder.id)} className="text-slate-400 hover:text-blue-500 p-1 transition-colors"><Copy size={16} /></button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full bg-red-50 text-red-500 text-xs font-medium p-3 rounded-xl mb-6 text-left border border-red-100">
+                <span className="font-bold">⚠️ Quan trọng:</span> Vui lòng ghi ĐÚNG nội dung chuyển khoản để hệ thống tự động nhận diện và cộng điểm cho bạn.
+              </div>
+
+              <button
+                onClick={() => setShowQRModal(false)}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3.5 rounded-full transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={18} /> Tôi đã chuyển khoản xong
+              </button>
+
+            </div>
+          </div>
+        )}
 
         <style
           dangerouslySetInnerHTML={{

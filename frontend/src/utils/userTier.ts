@@ -21,10 +21,10 @@ export const resolveUserTier = (role?: string, totalDeposited?: number): UserTie
 
   const total = Number(totalDeposited || 0);
   if (total < 50000) return null;
-  if (total >= 5000000) return { key: 'PHU_BA', label: 'Phu ba', className: 'bg-yellow-400 text-black font-black' };
-  if (total >= 2000000) return { key: 'CAP_5', label: 'Cap 5', className: 'bg-orange-500 text-white' };
-  if (total >= 1000000) return { key: 'CAP_4', label: 'Cap 4', className: 'bg-pink-500 text-white' };
-  if (total >= 500000) return { key: 'CAP_3', label: 'Cap 3', className: 'bg-blue-500 text-white' };
-  if (total >= 200000) return { key: 'CAP_2', label: 'Cap 2', className: 'bg-green-500 text-white' };
-  return { key: 'CAP_1', label: 'Cap 1', className: 'bg-slate-500 text-white' };
+  if (total >= 5000000) return { key: 'PHU_BA', label: 'Phú bà', className: 'bg-yellow-400 text-black font-black' };
+  if (total >= 2000000) return { key: 'CAP_5', label: 'Cấp 5', className: 'bg-orange-500 text-white' };
+  if (total >= 1000000) return { key: 'CAP_4', label: 'Cấp 4', className: 'bg-pink-500 text-white' };
+  if (total >= 500000) return { key: 'CAP_3', label: 'Cấp 3', className: 'bg-blue-500 text-white' };
+  if (total >= 200000) return { key: 'CAP_2', label: 'Cấp 2', className: 'bg-green-500 text-white' };
+  return { key: 'CAP_1', label: 'Cấp 1', className: 'bg-slate-500 text-white' };
 };
